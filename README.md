@@ -1,70 +1,253 @@
-# Getting Started with Create React App
+# 🌾 Rurality.app
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**Discover how rural any location in the United States is using comprehensive data analysis.**
 
-## Available Scripts
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-rurality.app-green)](https://rurality.app)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-18.x-61dafb.svg)](https://reactjs.org/)
 
-In the project directory, you can run:
+## 🎯 What is Rurality.app?
 
-### `npm start`
+Rurality.app provides a comprehensive **Rural Index Score** for any location in the United States by analyzing multiple data sources and factors that define rural vs. urban characteristics. Whether you're a researcher, policy maker, real estate professional, or just curious about your hometown, Rurality.app gives you data-driven insights into the rural nature of any place.
 
-Runs the app in the development mode.\
+## ✨ Features
+
+### 🔍 **Smart Location Analysis**
+- Search any city, county, or ZIP code in the US
+- GPS-powered current location detection
+- Real-time geocoding with OpenStreetMap
+
+### 📊 **Comprehensive Rural Index**
+Our proprietary algorithm analyzes 6 key factors:
+- **Population Density** - People per square mile
+- **Distance to Urban Centers** - Miles to nearest major city
+- **Agricultural Land Use** - Percentage of agricultural zoning
+- **Internet Access** - Broadband availability percentage
+- **Healthcare Density** - Medical facilities per 1,000 residents
+- **Economic Diversity** - Variety of local industries
+
+### 📈 **Historical Trends**
+- 5-year historical rurality trends
+- Identify changing rural/urban patterns
+- Export trend data for research
+
+### 🗺️ **Interactive Mapping**
+- Real-time location mapping
+- Rurality heat map overlays
+- Multiple data layer views
+
+### 🔄 **Location Comparison**
+- Compare up to 5 locations side-by-side
+- Detailed metric breakdowns
+- Export comparison reports
+
+### 📱 **Mobile-First Design**
+- Responsive design for all devices
+- Touch-optimized interface
+- Offline capability (coming soon)
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 16+ and npm
+- Modern web browser
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/cwimpy/rurality-app.git
+cd rurality-app
+
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+```
+
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Environment Variables (Optional)
 
-### `npm test`
+Create a `.env` file for enhanced functionality:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```env
+# US Census Bureau API Key (optional - increases rate limits)
+REACT_APP_CENSUS_API_KEY=your_census_api_key
 
-### `npm run build`
+# Mapbox API Key (for advanced mapping features)
+REACT_APP_MAPBOX_TOKEN=your_mapbox_token
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+# Google Places API (for enhanced geocoding)
+REACT_APP_GOOGLE_PLACES_KEY=your_google_places_key
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🏗️ Tech Stack
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Frontend
+- **React 18** - Modern UI framework
+- **Tailwind CSS** - Utility-first styling
+- **Lucide React** - Beautiful icons
+- **OpenStreetMap** - Free mapping service
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Data Sources
+- **US Census Bureau API** - Population and demographic data
+- **USDA Rural-Urban Continuum Codes** - Official rural classifications
+- **FCC Broadband Data** - Internet access statistics
+- **OpenStreetMap Nominatim** - Free geocoding service
+- **Bureau of Labor Statistics** - Employment data
 
 ### Deployment
+- **Vercel** - Serverless deployment platform
+- **GitHub Actions** - Automated CI/CD
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## 📊 Rural Index Methodology
 
-### `npm run build` fails to minify
+The Rural Index Score (0-100) is calculated using a weighted algorithm:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+Rural Index = (Population Density × 0.25) + 
+              (Distance to Urban × 0.20) + 
+              (Agricultural Land × 0.15) + 
+              (Internet Access × 0.15) + 
+              (Healthcare Density × 0.15) + 
+              (Economic Diversity × 0.10)
+```
+
+### Score Classifications
+- **80-100**: Very Rural
+- **60-79**: Rural  
+- **40-59**: Mixed
+- **20-39**: Suburban
+- **0-19**: Urban
+
+## 🔧 Development
+
+### Available Scripts
+
+```bash
+# Start development server
+npm start
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
+
+### Project Structure
+
+```
+rurality-app/
+├── public/                 # Static assets
+├── src/
+│   ├── components/        # Reusable UI components
+│   ├── services/          # API and data services
+│   ├── utils/             # Helper functions
+│   ├── hooks/             # Custom React hooks
+│   └── App.js             # Main application component
+├── docs/                  # Documentation
+└── tests/                 # Test files
+```
+
+## 🌍 API Documentation
+
+### Rurality Score Endpoint (Coming Soon)
+
+```javascript
+// GET /api/rurality?location={location}
+const response = await fetch('/api/rurality?location=Yellowstone County, MT');
+const data = await response.json();
+
+// Response format
+{
+  "location": "Yellowstone County, MT",
+  "coordinates": { "lat": 45.7833, "lng": -108.5007 },
+  "ruralityScore": 72,
+  "classification": "Rural",
+  "metrics": {
+    "populationDensity": { "value": 37.2, "score": 85 },
+    "distanceToUrban": { "value": 45, "score": 78 },
+    // ... additional metrics
+  },
+  "lastUpdated": "2024-01-15T10:30:00Z"
+}
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### Areas We Need Help
+
+- [ ] Additional data source integration
+- [ ] Mobile app development (React Native)
+- [ ] Advanced mapping features
+- [ ] Data visualization improvements
+- [ ] API rate limiting and caching
+- [ ] Accessibility improvements
+
+## 📈 Roadmap
+
+### Phase 1: Foundation ✅
+- [x] Basic UI and design
+- [x] Location search functionality
+- [x] Mock rurality calculations
+- [x] Local development setup
+
+### Phase 2: Real Data Integration 🚧
+- [ ] US Census Bureau API integration
+- [ ] USDA rural classification data
+- [ ] FCC broadband data integration
+- [ ] Improved geocoding accuracy
+- [ ] Historical data collection
+
+### Phase 3: Advanced Features 📋
+- [ ] User accounts and saved locations
+- [ ] Advanced mapping with Mapbox
+- [ ] PDF report generation
+- [ ] API rate limiting and caching
+- [ ] Mobile app development
+
+### Phase 4: Scale & Polish 🎯
+- [ ] Performance optimization
+- [ ] Advanced analytics
+- [ ] Enterprise features
+- [ ] White-label solutions
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **US Census Bureau** for providing comprehensive demographic data
+- **USDA Economic Research Service** for rural-urban classification codes
+- **OpenStreetMap** contributors for mapping data
+- **React** and **Tailwind CSS** communities for excellent tools
+
+## 📧 Contact
+
+- **Website**: [rurality.app](https://rurality.app)
+- **Issues**: [GitHub Issues](https://github.com/cwimpy/rurality-app/issues)
+- **Email**: hello@rurality.app
+
+---
+
+**Built with ❤️ for rural communities and researchers everywhere.**
