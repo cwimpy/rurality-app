@@ -246,7 +246,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Website**: [rurality.app](https://rurality.app)
 - **Issues**: [GitHub Issues](https://github.com/cwimpy/rurality-app/issues)
-- **Email**: hello@rurality.app
+- **Email**: cwimpy@mac.com
 
 ---
 
