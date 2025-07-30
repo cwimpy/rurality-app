@@ -1,3 +1,4 @@
+import RuralityDataService from './services/dataServices';
 import React, { useState, useEffect } from 'react';
 import { Search, MapPin, TrendingUp, BarChart3, Layers, Plus, X, Navigation, Info, Filter, Download, Share2, Zap, Wifi, Building2, Tractor, Heart, DollarSign, AlertCircle } from 'lucide-react';
 
@@ -244,11 +245,11 @@ const RuralityApp = () => {
   };
 
   const getRuralityLevel = (score) => {
-    if (score >= 80) return { level: 'Very Rural', color: 'text-green-700 bg-green-100 border-green-200' };
-    if (score >= 60) return { level: 'Rural', color: 'text-green-600 bg-green-50 border-green-200' };
-    if (score >= 40) return { level: 'Mixed', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' };
-    if (score >= 20) return { level: 'Suburban', color: 'text-orange-600 bg-orange-50 border-orange-200' };
-    return { level: 'Urban', color: 'text-red-600 bg-red-50 border-red-200' };
+    if (score >= 80) return { level: 'Very Rural', color: 'text-green-800 bg-green-200 border-green-300' };
+    if (score >= 60) return { level: 'Rural', color: 'text-green-700 bg-green-100 border-green-300' };
+    if (score >= 40) return { level: 'Mixed', color: 'text-yellow-700 bg-yellow-100 border-yellow-300' };
+    if (score >= 20) return { level: 'Suburban', color: 'text-orange-700 bg-orange-100 border-orange-300' };
+    return { level: 'Urban', color: 'text-red-700 bg-red-100 border-red-300' };
   };
 
   const shareResults = async () => {
@@ -276,22 +277,47 @@ const RuralityApp = () => {
   const exportData = () => {
     if (!ruralityData) return;
     
-    const exportData = {
-      location: currentLocation,
-      ruralityScore: ruralityData.overallScore,
-      metrics: ruralityData.metrics,
-      generatedAt: new Date().toISOString()
-    };
+    // Create CSV data
+    const csvData = [
+      // Header row
+      ['Metric', 'Value', 'Score'],
+      // Basic info
+      ['Location', currentLocation, ''],
+      ['Overall Rural Index', ruralityData.overallScore, ruralityData.overallScore],
+      ['Classification', getRuralityLevel(ruralityData.overallScore).level, ''],
+      ['', '', ''], // Empty row
+      // Metrics
+      ...Object.entries(ruralityData.metrics).map(([key, metric]) => [
+        metric.label,
+        metric.value,
+        metric.score
+      ]),
+      ['', '', ''], // Empty row
+      // Demographics
+      ['Total Population', ruralityData.demographics?.population || 'N/A', ''],
+      ['Median Age', ruralityData.demographics?.medianAge || 'N/A', ''],
+      ['Median Income', ruralityData.demographics?.medianIncome ? `${ruralityData.demographics.medianIncome.toLocaleString()}` : 'N/A', ''],
+      ['Unemployment Rate', ruralityData.demographics?.unemploymentRate ? `${ruralityData.demographics.unemploymentRate}%` : 'N/A', '']
+    ];
     
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    // Convert to CSV string
+    const csvString = csvData.map(row => 
+      row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
     
-    const exportFileDefaultName = `rurality-${currentLocation.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    // Create download
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
     
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `rurality-${currentLocation.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const MapView = () => (
@@ -395,7 +421,7 @@ const RuralityApp = () => {
               className="flex items-center space-x-2 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              <span>Export</span>
+              <span>Export CSV</span>
             </button>
             <button 
               onClick={shareResults}
@@ -501,16 +527,16 @@ const RuralityApp = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-100 to-emerald-100">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm border-b border-green-100 sticky top-0 z-50">
+      <header className="bg-white/90 backdrop-blur-sm border-b border-green-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center">
                 <Layers className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-green-700 to-emerald-700 bg-clip-text text-transparent">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-green-800 to-emerald-800 bg-clip-text text-transparent">
                 Rurality.app
               </h1>
             </div>
@@ -526,7 +552,7 @@ const RuralityApp = () => {
                   onClick={() => setActiveView(id)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                     activeView === id
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-green-200 text-green-800'
                       : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
                   }`}
                 >
@@ -542,7 +568,7 @@ const RuralityApp = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search Section */}
         <div className="mb-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -552,14 +578,14 @@ const RuralityApp = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery)}
-                  className="w-full pl-10 pr-4 py-3 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-3 border border-green-300 rounded-xl focus:ring-2 focus:ring-green-600 focus:border-transparent outline-none"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={getCurrentLocation}
                   disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-3 bg-green-100 hover:bg-green-200 text-green-700 rounded-xl transition-colors disabled:opacity-50"
+                  className="flex items-center space-x-2 px-4 py-3 bg-green-200 hover:bg-green-300 text-green-800 rounded-xl transition-colors disabled:opacity-50"
                 >
                   <Navigation className="w-4 h-4" />
                   <span className="hidden sm:inline">GPS</span>
@@ -567,7 +593,7 @@ const RuralityApp = () => {
                 <button
                   onClick={() => handleLocationSearch(searchQuery)}
                   disabled={loading || !searchQuery.trim()}
-                  className="flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors disabled:opacity-50"
+                  className="flex items-center space-x-2 px-6 py-3 bg-green-700 hover:bg-green-800 text-white rounded-xl transition-colors disabled:opacity-50"
                 >
                   {loading ? 'Analyzing...' : 'Analyze'}
                 </button>
@@ -589,7 +615,7 @@ const RuralityApp = () => {
                   key={place}
                   onClick={() => handleLocationSearch(place)}
                   disabled={loading}
-                  className="px-3 py-1 text-sm bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors border border-green-200 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors border border-green-300 disabled:opacity-50"
                 >
                   {place}
                 </button>
@@ -760,11 +786,40 @@ const RuralityApp = () => {
         )}
       </main>
 
+      {/* Footer with Creator Attribution */}
+      <footer className="bg-white border-t border-green-200 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <div className="flex items-center space-x-4">
+              {/* Organization Logo Placeholder */}
+              <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">C</span>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-700">Built by Cameron Wimpy</div>
+                <div className="text-xs text-slate-500">Powered by US Government Data Sources</div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-6 text-sm text-slate-600">
+              <a href="#" className="hover:text-green-700 transition-colors">About</a>
+              <a href="#" className="hover:text-green-700 transition-colors">API</a>
+              <a href="#" className="hover:text-green-700 transition-colors">Contact</a>
+              <a href="https://github.com/cwimpy/rurality-app" className="hover:text-green-700 transition-colors">GitHub</a>
+            </div>
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-green-100 text-center text-xs text-slate-500">
+            <p>© 2024 Rurality.app • Data from US Census Bureau, USDA, and FCC • Updated in real-time</p>
+          </div>
+        </div>
+      </footer>
+
       {/* Mobile-optimized info panel */}
       <div className="fixed bottom-4 right-4 z-40">
-        <div className="bg-white rounded-xl shadow-lg border border-green-100 p-4 max-w-xs">
+        <div className="bg-white rounded-xl shadow-lg border border-green-200 p-4 max-w-xs">
           <div className="flex items-start space-x-3">
-            <Info className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+            <Info className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
               <div className="font-medium text-slate-800 mb-1">Live Data Sources</div>
               <div className="text-slate-600 space-y-1 text-xs">
