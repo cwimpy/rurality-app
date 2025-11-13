@@ -1,5 +1,4 @@
-import RuralityDataService from './services/dataServices';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, MapPin, TrendingUp, BarChart3, Layers, Plus, X, Navigation, Info, Filter, Download, Share2, Zap, Wifi, Building2, Tractor, Heart, DollarSign, AlertCircle } from 'lucide-react';
 
 const RuralityApp = () => {
@@ -7,7 +6,6 @@ const RuralityApp = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState('dashboard');
   const [comparisonPlaces, setComparisonPlaces] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(2023);
   const [ruralityData, setRuralityData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -120,13 +118,8 @@ const RuralityApp = () => {
 
   const getCensusData = async (lat, lng) => {
     try {
-      // Using free Census Bureau API
-      const response = await fetch(
-        `https://api.census.gov/data/2021/acs/acs5?get=B01003_001E,B19013_001E,B25001_001E&for=tract:*&in=state:*&in=county:*`
-      );
-      
-      // For demo purposes, simulate data based on coordinates
-      // In real implementation, you'd process the Census API response
+      // TODO: Replace with real Census API integration (see INTEGRATION_GUIDE.md)
+      // For now, simulate data based on coordinates
       const simulatedData = {
         populationDensity: Math.max(1, Math.random() * 5000),
         population: Math.floor(Math.random() * 50000) + 1000,
@@ -265,7 +258,7 @@ const RuralityApp = () => {
       try {
         await navigator.share(shareData);
       } catch (error) {
-        console.log('Share failed:', error);
+        // Share cancelled or failed - silent fail is acceptable for share action
       }
     } else {
       // Fallback: copy to clipboard
@@ -802,9 +795,9 @@ const RuralityApp = () => {
             </div>
             
             <div className="flex items-center space-x-6 text-sm text-slate-600">
-              <a href="#" className="hover:text-green-700 transition-colors">About</a>
-              <a href="#" className="hover:text-green-700 transition-colors">API</a>
-              <a href="#" className="hover:text-green-700 transition-colors">Contact</a>
+              <a href="/METHODOLOGY.md" className="hover:text-green-700 transition-colors">About</a>
+              <a href="/METHODOLOGY.md#api-documentation" className="hover:text-green-700 transition-colors">API</a>
+              <a href="mailto:cwimpy@mac.com" className="hover:text-green-700 transition-colors">Contact</a>
               <a href="https://github.com/cwimpy/rurality-app" className="hover:text-green-700 transition-colors">GitHub</a>
             </div>
           </div>
