@@ -17,14 +17,14 @@ Rurality.app provides a comprehensive **Rural Index Score** for any location in 
 - GPS-powered current location detection
 - Real-time geocoding with OpenStreetMap
 
-### 📊 **Comprehensive Rural Index**
-Our proprietary algorithm analyzes 6 key factors:
-- **Population Density** - People per square mile
-- **Distance to Urban Centers** - Miles to nearest major city
-- **Agricultural Land Use** - Percentage of agricultural zoning
-- **Internet Access** - Broadband availability percentage
-- **Healthcare Density** - Medical facilities per 1,000 residents
-- **Economic Diversity** - Variety of local industries
+### 📊 **Evidence-Based Rural Index**
+Our methodology builds on the **USDA Rural-Urban Continuum Codes** (the federal gold standard) enhanced with real-time data:
+- **USDA Classification (50%)** - Official federal rurality codes
+- **Population Density (25%)** - People per square mile from US Census
+- **Distance to Metro Areas (15%)** - Calculated proximity to cities of various sizes
+- **Broadband Access (10%)** - Internet availability when data is available
+
+[See detailed methodology](METHODOLOGY.md) with data sources and citations.
 
 ### 📈 **Historical Trends**
 - 5-year historical rurality trends
@@ -92,11 +92,13 @@ REACT_APP_GOOGLE_PLACES_KEY=your_google_places_key
 - **OpenStreetMap** - Free mapping service
 
 ### Data Sources
-- **US Census Bureau API** - Population and demographic data
-- **USDA Rural-Urban Continuum Codes** - Official rural classifications
-- **FCC Broadband Data** - Internet access statistics
+- **USDA Economic Research Service** - Rural-Urban Continuum Codes (2013)
+- **US Census Bureau API** - Population and demographic data (2022)
+- **US Census Bureau** - Metropolitan Statistical Areas (2020)
+- **FCC Broadband Data** - Internet access statistics (when available)
 - **OpenStreetMap Nominatim** - Free geocoding service
-- **Bureau of Labor Statistics** - Employment data
+
+All sources are cited in [METHODOLOGY.md](METHODOLOGY.md)
 
 ### Deployment
 - **Vercel** - Serverless deployment platform
@@ -104,23 +106,31 @@ REACT_APP_GOOGLE_PLACES_KEY=your_google_places_key
 
 ## 📊 Rural Index Methodology
 
-The Rural Index Score (0-100) is calculated using a weighted algorithm:
+The Rural Index Score (0-100) uses a **hybrid approach** that prioritizes official federal classifications:
 
 ```
-Rural Index = (Population Density × 0.25) + 
-              (Distance to Urban × 0.20) + 
-              (Agricultural Land × 0.15) + 
-              (Internet Access × 0.15) + 
-              (Healthcare Density × 0.15) + 
-              (Economic Diversity × 0.10)
+Rural Index = (USDA RUCC × 0.50) +
+              (Population Density × 0.25) +
+              (Distance to Metros × 0.15) +
+              (Broadband Access × 0.10)*
+
+* When broadband data unavailable, weight redistributes to other factors
 ```
+
+**Why this approach?**
+- **USDA RUCC** is the federal government's official rurality measure, developed by researchers and used for policy
+- We enhance it with granular, real-time data for more detailed insights
+- All data sources are cited, all calculations are transparent
+- No placeholder or fabricated data
 
 ### Score Classifications
-- **80-100**: Very Rural
-- **60-79**: Rural  
-- **40-59**: Mixed
-- **20-39**: Suburban
-- **0-19**: Urban
+- **80-100**: Very Rural 🌾
+- **60-79**: Rural 🏞️
+- **40-59**: Mixed 🏘️
+- **20-39**: Suburban 🏡
+- **0-19**: Urban 🏙️
+
+**See [METHODOLOGY.md](METHODOLOGY.md) for complete details, data sources, and academic citations.**
 
 ## 🔧 Development
 
@@ -147,15 +157,16 @@ npm run format
 
 ```
 rurality-app/
-├── public/                 # Static assets
+├── public/                    # Static assets
 ├── src/
-│   ├── components/        # Reusable UI components
-│   ├── services/          # API and data services
-│   ├── utils/             # Helper functions
-│   ├── hooks/             # Custom React hooks
-│   └── App.js             # Main application component
-├── docs/                  # Documentation
-└── tests/                 # Test files
+│   ├── components/           # Reusable UI components
+│   ├── data/                 # USDA codes, metro data
+│   ├── services/             # API and calculation services
+│   ├── utils/                # API utilities, rate limiting, caching
+│   └── App.js                # Main application component
+├── METHODOLOGY.md            # Detailed methodology documentation
+├── DEPLOYMENT.md             # Deployment guide
+└── PRODUCTION_READINESS.md   # Production checklist
 ```
 
 ## 🌍 API Documentation
@@ -211,12 +222,13 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - [x] Mock rurality calculations
 - [x] Local development setup
 
-### Phase 2: Real Data Integration 🚧
-- [ ] US Census Bureau API integration
-- [ ] USDA rural classification data
-- [ ] FCC broadband data integration
-- [ ] Improved geocoding accuracy
-- [ ] Historical data collection
+### Phase 2: Real Data Integration ✅
+- [x] USDA Rural-Urban Continuum Codes integration
+- [x] US Census Bureau API integration
+- [x] Evidence-based calculation methodology
+- [ ] Complete RUCC database (all 3,142 counties)
+- [ ] FCC broadband API integration
+- [ ] Historical trend data collection
 
 ### Phase 3: Advanced Features 📋
 - [ ] User accounts and saved locations
