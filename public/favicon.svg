@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="20" fill="#1a3a2a"/>
+  <!-- Rolling hills -->
+  <path d="M0 82 Q25 68 50 78 Q75 65 100 74 L100 100 L0 100 Z" fill="#2d5a3a" opacity="0.6"/>
+  <!-- 3 bars (simplified for small sizes) -->
+  <rect x="14" y="55" width="20" height="28" rx="4" fill="#d4a843"/>
+  <rect x="40" y="32" width="20" height="51" rx="4" fill="#b8c97a"/>
+  <rect x="66" y="10" width="20" height="73" rx="4" fill="#f0ead6"/>
+</svg>
