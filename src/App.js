@@ -181,6 +181,17 @@ const RuralityApp = () => {
     window.history.replaceState({}, '', url);
   }, []);
 
+  // Fetch trends when switching to the tab OR when locationMeta arrives while on the tab
+  useEffect(() => {
+    if (activeView === 'trends' && locationMeta && !trendsData && !trendsLoading) {
+      setTrendsLoading(true);
+      fetchMultiYearCensusData(locationMeta.stateFips, locationMeta.countyFips)
+        .then(data => { setTrendsData(data); setTrendsLoading(false); })
+        .catch(() => setTrendsLoading(false));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, locationMeta]);
+
   // Auto-search from URL ?q= parameter on initial load
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
