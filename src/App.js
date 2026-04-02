@@ -1832,11 +1832,12 @@ your_data <- your_data |>
             <div className="rounded-2xl shadow-md overflow-hidden" style={{ backgroundColor: 'var(--color-forest)' }}>
               <div className="px-8 py-12 sm:py-16 text-center">
                 <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-                  How rural is your place?
+                  Really, how rural are you?
                 </h2>
                 <p className="text-white/70 max-w-xl mx-auto text-lg leading-relaxed">
-                  Every score comes from real government data — USDA RUCA codes,
-                  Census demographics, and distance to metro areas. No simulations.
+                  We use real data including USDA RUCA codes, Census demographics,
+                  and distance to metro areas to build a composite rurality score
+                  for any location in the United States.
                 </p>
               </div>
             </div>
