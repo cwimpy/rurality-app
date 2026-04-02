@@ -59,15 +59,15 @@ export const LARGE_METROS = [
   { name: "Salt Lake City, UT", lat: 40.7608, lng: -111.8910, pop: 1257936 },
   { name: "Hartford, CT", lat: 41.7658, lng: -72.6734, pop: 1204877 },
   { name: "Buffalo, NY", lat: 42.8864, lng: -78.8784, pop: 1166902 },
-  { name: "Birmingham, AL", lat: 33.5207, lng: -86.8025, pop: 1115289 }
+  { name: "Birmingham, AL", lat: 33.5207, lng: -86.8025, pop: 1115289 },
+  { name: "Grand Rapids, MI", lat: 42.9634, lng: -85.6681, pop: 1087592 },
+  { name: "Tucson, AZ", lat: 32.2226, lng: -110.9747, pop: 1043433 }
 ];
 
 /**
  * Medium Metro Areas (250,000 - 1 million population)
  */
 export const MEDIUM_METROS = [
-  { name: "Grand Rapids, MI", lat: 42.9634, lng: -85.6681, pop: 1087592 },
-  { name: "Tucson, AZ", lat: 32.2226, lng: -110.9747, pop: 1043433 },
   { name: "Fresno, CA", lat: 36.7378, lng: -119.7871, pop: 999101 },
   { name: "Omaha, NE", lat: 41.2565, lng: -95.9345, pop: 967604 },
   { name: "Albuquerque, NM", lat: 35.0844, lng: -106.6504, pop: 916528 },
@@ -84,8 +84,20 @@ export const MEDIUM_METROS = [
   { name: "Fort Wayne, IN", lat: 41.0793, lng: -85.1394, pop: 419453 },
   { name: "Fargo, ND", lat: 46.8772, lng: -96.7898, pop: 268012 },
   { name: "Sioux Falls, SD", lat: 43.5460, lng: -96.7313, pop: 265653 },
-  { name: "Billings, MT", lat: 45.7833, lng: -108.5007, pop: 184167 },
-  { name: "Eugene, OR", lat: 44.0521, lng: -123.0868, pop: 382971 }
+  { name: "Eugene, OR", lat: 44.0521, lng: -123.0868, pop: 382971 },
+  { name: "Fayetteville, AR", lat: 36.0626, lng: -94.1574, pop: 545671 },
+  { name: "Huntsville, AL", lat: 34.7304, lng: -86.5861, pop: 460054 },
+  { name: "Chattanooga, TN", lat: 35.0456, lng: -85.3097, pop: 574893 },
+  { name: "Greenville, SC", lat: 34.8526, lng: -82.3940, pop: 942529 },
+  { name: "Columbia, SC", lat: 33.9988, lng: -81.0453, pop: 836479 },
+  { name: "Savannah, GA", lat: 32.0835, lng: -81.0998, pop: 404798 },
+  { name: "Columbus, GA", lat: 32.4610, lng: -84.9877, pop: 337099 },
+  { name: "Evansville, IN", lat: 37.9716, lng: -87.5711, pop: 316429 },
+  { name: "Springfield, MO", lat: 37.2153, lng: -93.2982, pop: 467369 },
+  { name: "Tuscaloosa, AL", lat: 33.2098, lng: -87.5692, pop: 276678 },
+  { name: "Fort Smith, AR", lat: 35.3859, lng: -94.3985, pop: 255435 },
+  { name: "Pensacola, FL", lat: 30.4213, lng: -87.2169, pop: 502629 },
+  { name: "Tallahassee, FL", lat: 30.4518, lng: -84.2807, pop: 390560 }
 ];
 
 /**
@@ -93,16 +105,38 @@ export const MEDIUM_METROS = [
  * Sample of representative small metros
  */
 export const SMALL_METROS = [
+  // West / Mountain
   { name: "Missoula, MT", lat: 46.8721, lng: -113.9940, pop: 117922 },
+  { name: "Billings, MT", lat: 45.7833, lng: -108.5007, pop: 184167 },
+  { name: "Flagstaff, AZ", lat: 35.1983, lng: -111.6513, pop: 145101 },
+  { name: "Bend, OR", lat: 44.0582, lng: -121.3153, pop: 197692 },
+  { name: "Chico, CA", lat: 39.7285, lng: -121.8375, pop: 212843 },
+  // Plains / Midwest
   { name: "Ames, IA", lat: 42.0308, lng: -93.6319, pop: 123792 },
+  { name: "Rapid City, SD", lat: 44.0805, lng: -103.2310, pop: 148156 },
+  { name: "Bismarck, ND", lat: 46.8083, lng: -100.7837, pop: 129508 },
+  { name: "Joplin, MO", lat: 37.0842, lng: -94.5133, pop: 186024 },
+  { name: "Cape Girardeau, MO", lat: 37.3059, lng: -89.5181, pop: 101138 },
+  { name: "Owensboro, KY", lat: 37.7719, lng: -87.1111, pop: 118441 },
+  { name: "Muncie, IN", lat: 40.1934, lng: -85.3864, pop: 115072 },
+  { name: "Paducah, KY", lat: 37.0834, lng: -88.6001, pop: 97551 },
+  // South / Southeast
+  { name: "Jonesboro, AR", lat: 35.8423, lng: -90.7043, pop: 131012 },
+  { name: "Monroe, LA", lat: 32.5093, lng: -92.1193, pop: 176988 },
+  { name: "Hattiesburg, MS", lat: 31.3271, lng: -89.2903, pop: 169351 },
+  { name: "Tupelo, MS", lat: 34.2576, lng: -88.7034, pop: 175673 },
+  { name: "Meridian, MS", lat: 32.3643, lng: -88.7037, pop: 104062 },
+  { name: "Florence, SC", lat: 34.1954, lng: -79.7626, pop: 207621 },
+  { name: "Bowling Green, KY", lat: 36.9903, lng: -86.4436, pop: 179135 },
+  { name: "Jackson, TN", lat: 35.6145, lng: -88.8139, pop: 183182 },
+  { name: "Dothan, AL", lat: 31.2232, lng: -85.3905, pop: 149289 },
+  { name: "Texarkana, TX", lat: 33.4418, lng: -94.0477, pop: 149198 },
+  { name: "Hot Springs, AR", lat: 34.5037, lng: -93.0552, pop: 100039 },
+  // Northeast
   { name: "Burlington, VT", lat: 44.4759, lng: -73.2121, pop: 225562 },
   { name: "Ithaca, NY", lat: 42.4430, lng: -76.5019, pop: 102237 },
-  { name: "Flagstaff, AZ", lat: 35.1983, lng: -111.6513, pop: 145101 },
-  { name: "College Station, TX", lat: 30.6280, lng: -96.3344, pop: 273101 },
-  { name: "Chico, CA", lat: 39.7285, lng: -121.8375, pop: 212843 },
-  { name: "Bend, OR", lat: 44.0582, lng: -121.3153, pop: 197692 },
-  { name: "Rapid City, SD", lat: 44.0805, lng: -103.2310, pop: 148156 },
-  { name: "Bismarck, ND", lat: 46.8083, lng: -100.7837, pop: 129508 }
+  // Texas / Southwest
+  { name: "College Station, TX", lat: 30.6280, lng: -96.3344, pop: 273101 }
 ];
 
 /**

@@ -345,7 +345,7 @@ class RuralityDataService {
   }
 
   async getRuralUrbanLookup() {
-    // USDA 2013 Rural-Urban Continuum Codes
+    // USDA 2023 Rural-Urban Continuum Codes
     return {
       "30111": { code: 3, description: "Counties in metro areas of fewer than 250,000 population" },
       "06059": { code: 1, description: "Counties in metro areas of 1 million population or more" },

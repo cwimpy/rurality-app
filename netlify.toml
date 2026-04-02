@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+# Single-page app: redirect all routes back to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

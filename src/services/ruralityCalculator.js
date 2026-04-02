@@ -1,129 +1,101 @@
 /**
- * Rurality Calculator - Honest, Research-Based Methodology
+ * Rurality Calculator — Research-Based Hybrid Methodology
  *
- * This calculator uses a hybrid approach based on:
- * 1. USDA Rural-Urban Continuum Codes (50% weight) - The federal gold standard
- * 2. Population Density (25% weight) - From US Census Bureau
- * 3. Distance to Metro Areas (15% weight) - Calculated from census data
- * 4. Broadband Access (10% weight) - From FCC data when available
+ * Weights (when RUCA is available):
+ *   RUCA code          50%  — USDA gold standard commuting-area classification
+ *   Population density 25%  — Census ACS
+ *   Distance to metro  15%  — Haversine to nearest metro tier
+ *   Broadband access   10%  — FCC / NTIA (when available)
  *
- * This approach prioritizes official federal classifications while adding
- * granular data where available. All calculations are transparent and
- * cite their data sources.
- *
- * @author Cameron Wimpy
- * @license MIT
+ * When RUCA is unavailable (ZIP not in dataset), weights redistribute:
+ *   Population density 55%, Distance 30%, Broadband 15%
+ *   Confidence drops to 'medium'.
  */
 
-import { getRUCC, getRUCCDescription, ruccToScore, isRuralByUSDA } from '../data/ruralUrbanCodes';
+import { rucaToScore, getRUCADescription, isRuralByRUCA } from '../data/rucaZcta';
 import { calculateMetroDistances } from '../data/metroAreas';
 
 /**
- * Calculate comprehensive rurality score
+ * Calculate comprehensive rurality score.
  *
- * @param {Object} params - Input parameters
- * @param {string} params.stateFips - 2-digit state FIPS code
- * @param {string} params.countyFips - 3-digit county FIPS code
- * @param {number} params.lat - Latitude
- * @param {number} params.lng - Longitude
- * @param {number} params.populationDensity - People per square mile
- * @param {number} [params.broadbandAccess] - Percentage with broadband (0-100)
+ * @param {Object}  params
+ * @param {number}  params.lat              - Latitude
+ * @param {number}  params.lng              - Longitude
+ * @param {number}  params.populationDensity - People per square mile
+ * @param {number|null} [params.ruca]       - RUCA code 1–10 (null = not available)
+ * @param {number|null} [params.broadbandAccess] - Percent with broadband (0–100)
  * @returns {Object} Comprehensive rurality analysis
  */
 export function calculateRuralityScore({
-  stateFips,
-  countyFips,
   lat,
   lng,
   populationDensity,
+  ruca = null,
   broadbandAccess = null
 }) {
-  // Validate inputs
-  if (!stateFips || !countyFips || lat === undefined || lng === undefined || populationDensity === undefined) {
-    throw new Error('Missing required parameters for rurality calculation');
+  if (lat === undefined || lng === undefined || populationDensity === undefined) {
+    throw new Error('lat, lng, and populationDensity are required');
   }
 
-  // 1. Get USDA Rural-Urban Continuum Code (50% weight)
-  const rucc = getRUCC(stateFips, countyFips);
+  // ── 1. RUCA component ────────────────────────────────────────────────────
+  const rucaScore = ruca !== null ? rucaToScore(ruca) : null;
+  const rucaDescription = ruca !== null ? getRUCADescription(ruca) : null;
+  const officiallyRural = ruca !== null ? isRuralByRUCA(ruca) : null;
 
-  if (rucc === null) {
-    throw new Error(`No RUCC data found for FIPS ${stateFips}${countyFips}. County may not be in database yet.`);
-  }
+  // ── 2. Population density component ─────────────────────────────────────
+  const densityScore = calcDensityScore(populationDensity);
 
-  const ruccScore = ruccToScore(rucc);
-  const ruccDescription = getRUCCDescription(rucc);
-  const officiallyRural = isRuralByUSDA(rucc);
-
-  // 2. Calculate Population Density Score (25% weight)
-  // Higher density = more urban (lower score)
-  // Using logarithmic scale because density varies exponentially
-  // Rural: <100 people/sq mi, Suburban: 100-2000, Urban: >2000
-  const densityScore = calculatePopulationDensityScore(populationDensity);
-
-  // 3. Calculate Distance to Metro Areas Score (15% weight)
+  // ── 3. Distance to metro component ──────────────────────────────────────
   const metroDistances = calculateMetroDistances(lat, lng);
-  const distanceScore = calculateDistanceScore(metroDistances);
+  const distanceScore = calcDistanceScore(metroDistances);
 
-  // 4. Calculate Broadband Access Score (10% weight)
-  // Lower broadband availability = more rural (higher score)
+  // ── 4. Broadband component ───────────────────────────────────────────────
   const broadbandScore = broadbandAccess !== null
-    ? calculateBroadbandScore(broadbandAccess)
+    ? Math.round(100 - broadbandAccess)
     : null;
 
-  // Calculate weighted overall score
-  let totalScore;
-  let weights;
+  // ── 5. Weighted total ────────────────────────────────────────────────────
+  let weights, totalScore;
 
-  if (broadbandScore !== null) {
-    // Full calculation with all factors
-    weights = {
-      rucc: 0.50,
-      density: 0.25,
-      distance: 0.15,
-      broadband: 0.10
-    };
-
-    totalScore = (
-      ruccScore * weights.rucc +
-      densityScore * weights.density +
-      distanceScore * weights.distance +
-      broadbandScore * weights.broadband
-    );
+  if (rucaScore !== null && broadbandScore !== null) {
+    weights = { ruca: 0.50, density: 0.25, distance: 0.15, broadband: 0.10 };
+    totalScore = rucaScore * weights.ruca + densityScore * weights.density +
+                 distanceScore * weights.distance + broadbandScore * weights.broadband;
+  } else if (rucaScore !== null) {
+    weights = { ruca: 0.55, density: 0.25, distance: 0.20, broadband: 0.00 };
+    totalScore = rucaScore * weights.ruca + densityScore * weights.density +
+                 distanceScore * weights.distance;
+  } else if (broadbandScore !== null) {
+    weights = { ruca: 0.00, density: 0.50, distance: 0.25, broadband: 0.25 };
+    totalScore = densityScore * weights.density + distanceScore * weights.distance +
+                 broadbandScore * weights.broadband;
   } else {
-    // Calculation without broadband data (redistribute weight)
-    weights = {
-      rucc: 0.55,
-      density: 0.30,
-      distance: 0.15,
-      broadband: 0.00
-    };
-
-    totalScore = (
-      ruccScore * weights.rucc +
-      densityScore * weights.density +
-      distanceScore * weights.distance
-    );
+    weights = { ruca: 0.00, density: 0.55, distance: 0.30, broadband: 0.00 };
+    totalScore = densityScore * weights.density + distanceScore * weights.distance;
   }
 
-  // Round to whole number
   const overallScore = Math.round(Math.max(0, Math.min(100, totalScore)));
-
-  // Determine classification
   const classification = getClassification(overallScore);
+
+  // Confidence: high = RUCA + broadband, medium-high = RUCA only,
+  //             medium = density + distance only
+  const confidence = rucaScore !== null
+    ? (broadbandScore !== null ? 'high' : 'medium-high')
+    : 'medium';
 
   return {
     overallScore,
     classification,
-    confidence: broadbandScore !== null ? 'high' : 'medium',
+    confidence,
     components: {
-      usda: {
-        code: rucc,
-        description: ruccDescription,
-        score: ruccScore,
-        weight: weights.rucc,
-        contribution: Math.round(ruccScore * weights.rucc),
+      ruca: rucaScore !== null ? {
+        code: ruca,
+        description: rucaDescription,
+        score: rucaScore,
+        weight: weights.ruca,
+        contribution: Math.round(rucaScore * weights.ruca),
         officiallyRural
-      },
+      } : null,
       populationDensity: {
         value: populationDensity,
         score: densityScore,
@@ -150,145 +122,40 @@ export function calculateRuralityScore({
       } : null
     },
     methodology: {
-      version: '1.0',
-      lastUpdated: '2024-01-15',
+      version: '2.0',
+      lastUpdated: '2025-01-01',
+      rucaAvailable: rucaScore !== null,
       sources: [
-        'USDA Economic Research Service Rural-Urban Continuum Codes (2013)',
-        'US Census Bureau American Community Survey (2022)',
-        'FCC Broadband Data (when available)'
+        'USDA ERS Rural-Urban Commuting Area Codes (RUCA 2020)',
+        'US Census Bureau ACS 5-Year (2022)',
+        'Census TIGER/Line for county land area',
+        ...(broadbandAccess !== null ? ['FCC Broadband Data'] : [])
       ],
       weights
     }
   };
 }
 
-/**
- * Calculate population density score
- * Uses logarithmic scale to handle exponential variation
- *
- * @param {number} density - People per square mile
- * @returns {number} Score from 0-100 (higher = more rural)
- */
-function calculatePopulationDensityScore(density) {
+function calcDensityScore(density) {
   if (density <= 0) return 100;
-
-  // Logarithmic scale
-  // 1 person/sq mi = 100 (very rural)
-  // 100 people/sq mi = 70 (rural)
-  // 1000 people/sq mi = 40 (suburban)
-  // 10000 people/sq mi = 10 (urban)
-  // 27000+ people/sq mi (NYC) = 0 (very urban)
-
-  const logDensity = Math.log10(density);
-  const score = 100 - (logDensity * 25);
-
-  return Math.max(0, Math.min(100, score));
-}
-
-/**
- * Calculate distance to metro areas score
- *
- * @param {Object} distances - Distances to nearest metros of each tier
- * @returns {number} Score from 0-100 (higher = more rural)
- */
-function calculateDistanceScore(distances) {
-  // Weighted average of distances
-  // Being close to any significant metro makes you less rural
-  const largeMetroScore = Math.min(100, distances.largeMetro.distance / 2);
-  const mediumMetroScore = Math.min(100, distances.mediumMetro.distance / 1.5);
-  const smallMetroScore = Math.min(100, distances.smallMetro.distance);
-
-  // Weight: Large metros matter most
-  const score = (
-    largeMetroScore * 0.5 +
-    mediumMetroScore * 0.3 +
-    smallMetroScore * 0.2
-  );
-
+  // Logarithmic: 1/sqmi → ~100, 100/sqmi → ~70, 1000/sqmi → ~45, 27000/sqmi → 0
+  const score = 100 - Math.log10(density) * 25;
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
-/**
- * Calculate broadband access score
- *
- * @param {number} broadbandAccess - Percentage with broadband (0-100)
- * @returns {number} Score from 0-100 (higher = more rural/less access)
- */
-function calculateBroadbandScore(broadbandAccess) {
-  // Invert: Lower access = more rural = higher score
-  return Math.round(100 - broadbandAccess);
+function calcDistanceScore(distances) {
+  const large = Math.min(100, distances.largeMetro.distance / 2);
+  const medium = Math.min(100, distances.mediumMetro.distance / 1.5);
+  const small = Math.min(100, distances.smallMetro.distance);
+  return Math.round(Math.max(0, Math.min(100, large * 0.5 + medium * 0.3 + small * 0.2)));
 }
 
-/**
- * Get classification label from score
- *
- * @param {number} score - Overall rurality score (0-100)
- * @returns {Object} Classification details
- */
 function getClassification(score) {
-  if (score >= 80) {
-    return {
-      label: 'Very Rural',
-      description: 'Remote rural area with minimal urban influence',
-      color: 'green',
-      emoji: '🌾'
-    };
-  } else if (score >= 60) {
-    return {
-      label: 'Rural',
-      description: 'Rural area with some distance from urban centers',
-      color: 'lime',
-      emoji: '🏞️'
-    };
-  } else if (score >= 40) {
-    return {
-      label: 'Mixed',
-      description: 'Mix of rural and urban characteristics',
-      color: 'yellow',
-      emoji: '🏘️'
-    };
-  } else if (score >= 20) {
-    return {
-      label: 'Suburban',
-      description: 'Suburban area near urban centers',
-      color: 'orange',
-      emoji: '🏡'
-    };
-  } else {
-    return {
-      label: 'Urban',
-      description: 'Urban area with high population density',
-      color: 'red',
-      emoji: '🏙️'
-    };
-  }
+  if (score >= 80) return { label: 'Very Rural',  description: 'Remote rural area with minimal urban influence',      color: 'green',  emoji: '🌾' };
+  if (score >= 60) return { label: 'Rural',        description: 'Rural area with some distance from urban centers',   color: 'lime',   emoji: '🏞️' };
+  if (score >= 40) return { label: 'Mixed',         description: 'Mix of rural and urban characteristics',            color: 'yellow', emoji: '🏘️' };
+  if (score >= 20) return { label: 'Suburban',      description: 'Suburban area near urban centers',                  color: 'orange', emoji: '🏡' };
+  return             { label: 'Urban',         description: 'Urban area with high population density',            color: 'red',    emoji: '🏙️' };
 }
 
-/**
- * Validate and calculate rurality with error handling
- *
- * @param {Object} params - Input parameters
- * @returns {Object} Results with error handling
- */
-export async function calculateRuralityWithValidation(params) {
-  try {
-    const result = calculateRuralityScore(params);
-    return {
-      success: true,
-      data: result,
-      error: null
-    };
-  } catch (error) {
-    console.error('Rurality calculation error:', error);
-    return {
-      success: false,
-      data: null,
-      error: error.message
-    };
-  }
-}
-
-export default {
-  calculateRuralityScore,
-  calculateRuralityWithValidation
-};
+export default { calculateRuralityScore };
