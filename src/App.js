@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search, MapPin, TrendingUp, BarChart3, Plus, X,
+  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu,
   Navigation, Info, Download, Share2, Zap, Wifi,
   Building2, Tractor, Heart, DollarSign, AlertCircle,
   BookOpen, FlaskConical, Users, ExternalLink, Scale, Database, Calculator
@@ -136,6 +136,7 @@ const RuralityApp = () => {
   const [trendsData, setTrendsData]     = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [showDataSources, setShowDataSources] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Preload lookup tables in the background immediately on mount.
   useEffect(() => {
@@ -839,8 +840,8 @@ const RuralityApp = () => {
             </div>
             <p className="text-sm text-slate-600 leading-relaxed">
               Cameron's research focuses on election administration, political methodology, and rural
-              governance. He has published extensively on how place-based factors — including rurality —
-              shape political behavior and administrative capacity.
+              public policy. His current work examines how rurality affects outcomes in election
+              administration and the voter experience.
             </p>
             <div className="flex flex-wrap gap-3 mt-3">
               <a
@@ -1498,7 +1499,10 @@ your_data <- your_data |>
       <header className="sticky top-0 z-50" style={{ backgroundColor: 'var(--color-forest)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-            <div className="flex items-center space-x-3">
+            <button
+              onClick={() => { setActiveView('dashboard'); setMenuOpen(false); window.scrollTo(0, 0); }}
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+            >
               <img
                 src={`${process.env.PUBLIC_URL}/logo.svg`}
                 alt="Rurality.app logo"
@@ -1507,8 +1511,10 @@ your_data <- your_data |>
               <h1 className="text-lg font-bold text-white tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 Rurality.app
               </h1>
-            </div>
-            <nav className="flex space-x-0.5">
+            </button>
+
+            {/* Desktop nav */}
+            <nav className="hidden md:flex space-x-0.5">
               {[
                 { id: 'dashboard',    label: 'Dashboard',      icon: BarChart3 },
                 { id: 'map',          label: 'Map',            icon: MapPin },
@@ -1537,12 +1543,58 @@ your_data <- your_data |>
                   }`}
                 >
                   <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{label}</span>
+                  <span>{label}</span>
                 </button>
               ))}
             </nav>
+
+            {/* Hamburger button — mobile only */}
+            <button
+              className="md:hidden text-white/80 hover:text-white p-1.5"
+              onClick={() => setMenuOpen(prev => !prev)}
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile dropdown menu */}
+        {menuOpen && (
+          <nav className="md:hidden border-t border-white/10 px-4 pb-3 pt-2 space-y-1" style={{ backgroundColor: 'var(--color-forest)' }}>
+            {[
+              { id: 'dashboard',    label: 'Dashboard',       icon: BarChart3 },
+              { id: 'map',          label: 'Map',             icon: MapPin },
+              { id: 'trends',       label: 'Trends',          icon: TrendingUp },
+              { id: 'methodology',  label: 'Methodology',     icon: FlaskConical },
+              { id: 'researchers',  label: 'For Researchers',  icon: BookOpen },
+              { id: 'about',        label: 'About',           icon: Info }
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => {
+                  setActiveView(id);
+                  setMenuOpen(false);
+                  window.scrollTo(0, 0);
+                  if (id === 'trends' && locationMeta && !trendsData && !trendsLoading) {
+                    setTrendsLoading(true);
+                    fetchMultiYearCensusData(locationMeta.stateFips, locationMeta.countyFips)
+                      .then(data => { setTrendsData(data); setTrendsLoading(false); })
+                      .catch(() => setTrendsLoading(false));
+                  }
+                }}
+                className={`flex items-center space-x-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  activeView === id
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
