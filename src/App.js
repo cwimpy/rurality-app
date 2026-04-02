@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search, MapPin, TrendingUp, BarChart3, Layers, Plus, X,
+  Search, MapPin, TrendingUp, BarChart3, Plus, X,
   Navigation, Info, Download, Share2, Zap, Wifi,
   Building2, Tractor, Heart, DollarSign, AlertCircle,
   BookOpen, FlaskConical, Users, ExternalLink, Scale, Database, Calculator
@@ -120,33 +120,6 @@ function buildRuralityDataForUI(calcResult, censusData) {
     },
     methodology
   };
-}
-
-// ── Full data-fetch pipeline (shared between search & comparison) ────────────
-// Census Geocoder gives us state FIPS (2-digit), county FIPS (3-digit), and
-// land area in one call — replacing the old FCC + TIGER pair.
-async function fetchRuralityForLocation(location) {
-  const geoData = await geocodeWithCache(location);
-
-  // Single call: county FIPS + land area from Census Geocoder
-  const countyData = await getCountyFromCoordinates(geoData.lat, geoData.lng);
-
-  const censusData = await fetchCensusData(countyData.stateFips, countyData.countyFips);
-
-  const populationDensity = countyData.areaSqMiles > 0
-    ? censusData.totalPopulation / countyData.areaSqMiles
-    : 0;
-
-  const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
-
-  const calcResult = calculateRuralityScore({
-    lat: geoData.lat,
-    lng: geoData.lng,
-    populationDensity,
-    ruca
-  });
-
-  return { geoData, countyData, censusData, calcResult };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────

@@ -158,4 +158,5 @@ function getClassification(score) {
   return             { label: 'Urban',         description: 'Urban area with high population density',            color: 'red',    emoji: '🏙️' };
 }
 
-export default { calculateRuralityScore };
+const ruralityCalculator = { calculateRuralityScore };
+export default ruralityCalculator;

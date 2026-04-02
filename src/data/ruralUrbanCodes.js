@@ -54,4 +54,5 @@ export function ruccToScore(rucc) {
 
 export function isRuralByRUCC(rucc) { return rucc >= 4; }
 
-export default { RUCC_DESCRIPTIONS, getRUCC, getRUCCDescription, ruccToScore, isRuralByRUCC };
+const ruralUrbanCodes = { RUCC_DESCRIPTIONS, getRUCC, getRUCCDescription, ruccToScore, isRuralByRUCC };
+export default ruralUrbanCodes;

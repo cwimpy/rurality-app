@@ -107,6 +107,7 @@ export async function geocodeWithCache(location) {
   const cached = geocodeCache.get(cacheKey);
 
   if (cached) {
+    // eslint-disable-next-line no-console
     console.log('Geocode cache hit for:', location);
     return cached;
   }
@@ -174,6 +175,7 @@ export async function fetchCensusData(stateFips, countyFips) {
   const cached = censusCache.get(cacheKey);
 
   if (cached) {
+    // eslint-disable-next-line no-console
     console.log('Census cache hit for:', cacheKey);
     return cached;
   }
@@ -309,6 +311,7 @@ export async function fetchMultiYearCensusData(stateFips, countyFips) {
 export function clearAllCaches() {
   geocodeCache.clear();
   censusCache.clear();
+  // eslint-disable-next-line no-console
   console.log('All caches cleared');
 }
 
@@ -320,7 +323,7 @@ export function getCacheStats() {
   };
 }
 
-export default {
+const apiUtils = {
   fetchWithRetry,
   geocodeWithCache,
   fetchCensusData,
@@ -329,3 +332,4 @@ export default {
   clearAllCaches,
   getCacheStats
 };
+export default apiUtils;

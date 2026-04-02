@@ -183,9 +183,10 @@ export function calculateMetroDistances(lat, lng) {
   };
 }
 
-export default {
+const metroAreas = {
   LARGE_METROS,
   MEDIUM_METROS,
   SMALL_METROS,
   calculateMetroDistances
 };
+export default metroAreas;

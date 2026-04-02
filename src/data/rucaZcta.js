@@ -56,4 +56,5 @@ export function getRUCADescription(ruca) {
 
 export function isRuralByRUCA(ruca) { return ruca >= 4; }
 
-export default { getRUCAForZcta, rucaToScore, getRUCADescription, isRuralByRUCA };
+const rucaZcta = { getRUCAForZcta, rucaToScore, getRUCADescription, isRuralByRUCA };
+export default rucaZcta;
