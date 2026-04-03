@@ -12,6 +12,14 @@
   --color-parchment: #f3f0e8;
 }
 
+.dark {
+  --color-forest: #0f2318;
+  --color-sage: #3a6349;
+  --color-wheat: #c49933;
+  --color-cream: #1a1a1a;
+  --color-parchment: #242424;
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);

@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu,
+  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet,
   Navigation, Info, Download, Share2, Zap, Wifi,
   Building2, Tractor, Heart, DollarSign, AlertCircle,
   BookOpen, FlaskConical, Users, ExternalLink, Scale, Database, Calculator
 } from 'lucide-react';
 
 import LeafletMap from './components/LeafletMap';
+import DarkModeToggle from './components/DarkModeToggle';
+import BatchLookup from './components/BatchLookup';
+import StateMap from './components/StateMap';
+import PlacesLikeThis from './components/PlacesLikeThis';
 
 import {
   geocodeWithCache,
@@ -1516,12 +1520,14 @@ your_data <- your_data |>
             {/* Desktop nav */}
             <nav className="hidden md:flex space-x-0.5">
               {[
-                { id: 'dashboard',    label: 'Dashboard',      icon: BarChart3 },
-                { id: 'map',          label: 'Map',            icon: MapPin },
-                { id: 'trends',       label: 'Trends',         icon: TrendingUp },
-                { id: 'methodology',  label: 'Methodology',    icon: FlaskConical },
-                { id: 'researchers',  label: 'For Researchers', icon: BookOpen },
-                { id: 'about',        label: 'About',          icon: Info }
+                { id: 'dashboard',    label: 'Dashboard',       icon: BarChart3 },
+                { id: 'map',          label: 'Map',             icon: MapPin },
+                { id: 'statemap',     label: 'US Counties',     icon: Globe },
+                { id: 'batch',        label: 'Batch',           icon: FileSpreadsheet },
+                { id: 'trends',       label: 'Trends',          icon: TrendingUp },
+                { id: 'methodology',  label: 'Methodology',     icon: FlaskConical },
+                { id: 'researchers',  label: 'For Researchers',  icon: BookOpen },
+                { id: 'about',        label: 'About',           icon: Info }
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -1548,14 +1554,17 @@ your_data <- your_data |>
               ))}
             </nav>
 
-            {/* Hamburger button — mobile only */}
-            <button
-              className="md:hidden text-white/80 hover:text-white p-1.5"
+            <div className="flex items-center space-x-1">
+              <DarkModeToggle />
+              {/* Hamburger button — mobile only */}
+              <button
+                className="md:hidden text-white/80 hover:text-white p-1.5"
               onClick={() => setMenuOpen(prev => !prev)}
               aria-label="Toggle menu"
             >
               {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1599,8 +1608,8 @@ your_data <- your_data |>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search — hidden on static pages */}
-        <div className={`mb-6 ${['about', 'methodology', 'researchers'].includes(activeView) ? 'hidden' : ''}`}>
-          <div className="bg-white rounded-2xl shadow-md p-5">
+        <div className={`mb-6 ${['about', 'methodology', 'researchers', 'batch', 'statemap'].includes(activeView) ? 'hidden' : ''}`}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -1666,7 +1675,9 @@ your_data <- your_data |>
 
         {/* Views */}
         {activeView === 'map' && <MapView />}
-        {activeView === 'trends'      && <TrendsView />}
+        {activeView === 'statemap'     && <StateMap onLocationSearch={(place) => { setSearchQuery(place); setActiveView('dashboard'); handleLocationSearch(place).catch(() => {}); }} />}
+        {activeView === 'batch'        && <BatchLookup />}
+        {activeView === 'trends'       && <TrendsView />}
         {activeView === 'methodology'  && <MethodologyView />}
         {activeView === 'researchers'  && <ForResearchersView />}
         {activeView === 'about'        && <AboutView />}
@@ -1821,6 +1832,16 @@ your_data <- your_data |>
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Places Like This */}
+            {locationMeta && (
+              <PlacesLikeThis
+                currentFips={`${locationMeta.stateFips}${locationMeta.countyFips}`}
+                currentRucc={getRUCC(locationMeta.stateFips, locationMeta.countyFips)}
+                currentDensity={ruralityData?.metrics?.populationDensity?.value}
+                onSearch={(place) => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
+              />
             )}
           </div>
         )}
