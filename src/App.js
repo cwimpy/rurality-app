@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet,
+  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap, Wifi,
   Building2, Tractor, Heart, DollarSign, AlertCircle,
   BookOpen, FlaskConical, Users, ExternalLink, Scale, Database, Calculator
@@ -11,6 +11,7 @@ import DarkModeToggle from './components/DarkModeToggle';
 import BatchLookup from './components/BatchLookup';
 import StateMap from './components/StateMap';
 import PlacesLikeThis from './components/PlacesLikeThis';
+import EmbedWidget from './components/EmbedWidget';
 
 import {
   geocodeWithCache,
@@ -141,6 +142,10 @@ const RuralityApp = () => {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [showDataSources, setShowDataSources] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('rurality-recent') || '[]'); }
+    catch { return []; }
+  });
 
   // Preload lookup tables in the background immediately on mount.
   useEffect(() => {
@@ -253,6 +258,15 @@ const RuralityApp = () => {
         geoData.displayName.split(',')[0];
       setCurrentLocation(resolvedName);
       updateURL(location);
+
+      // Save to recent searches
+      setRecentSearches(prev => {
+        const entry = { name: resolvedName, query: location, score: uiData.overallScore };
+        const updated = [entry, ...prev.filter(r => r.query !== location)].slice(0, 8);
+        try { localStorage.setItem('rurality-recent', JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+
       setRuralityData({
         ...uiData,
         classifications,
@@ -405,6 +419,40 @@ const RuralityApp = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const printReport = () => {
+    if (!ruralityData || !currentLocation) return;
+    const level = getRuralityLevel(ruralityData.overallScore);
+    const metrics = Object.entries(ruralityData.metrics)
+      .map(([, m]) => `<tr><td style="padding:4px 12px 4px 0">${m.label}</td><td style="text-align:right;padding:4px 0">${m.value}</td></tr>`)
+      .join('');
+    const demo = ruralityData.demographics;
+    const html = `<!DOCTYPE html><html><head><title>Rurality Report: ${currentLocation}</title>
+      <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#1e293b;line-height:1.6}
+      h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin-top:24px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+      .score{font-size:48px;font-weight:bold;margin:16px 0}.meta{color:#64748b;font-size:13px}
+      table{border-collapse:collapse;width:100%}td{padding:6px 12px 6px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
+      .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
+      @media print{body{margin:20px}}</style></head><body>
+      <h1>${currentLocation}</h1>
+      <p class="meta">Rurality Report generated ${new Date().toLocaleDateString()} via rurality.app</p>
+      <div class="score">${ruralityData.overallScore}<span style="font-size:16px;color:#64748b"> / 100</span></div>
+      <p><strong>${level.level}</strong> (Confidence: ${ruralityData.confidence})</p>
+      <h2>Metrics</h2><table>${metrics}</table>
+      <h2>Demographics</h2><table>
+      <tr><td>Population</td><td style="text-align:right">${demo?.population?.toLocaleString() ?? 'N/A'}</td></tr>
+      <tr><td>Median Income</td><td style="text-align:right">${demo?.medianIncome ? '$' + demo.medianIncome.toLocaleString() : 'N/A'}</td></tr>
+      <tr><td>Median Age</td><td style="text-align:right">${demo?.medianAge ?? 'N/A'}</td></tr>
+      <tr><td>Unemployment Rate</td><td style="text-align:right">${demo?.unemploymentRate ? demo.unemploymentRate + '%' : 'N/A'}</td></tr>
+      </table>
+      <div class="footer">Source: rurality.app | USDA ERS RUCC 2023, RUCA 2020 | Census ACS 2022<br/>
+      Cameron Wimpy, Institute for Rural Initiatives, Arkansas State University</div>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
   };
 
   // ── Classifications Panel ───────────────────────────────────────────────────
@@ -681,16 +729,26 @@ const RuralityApp = () => {
               <button
                 onClick={exportData}
                 className="flex items-center space-x-2 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
+                title="Download as CSV"
               >
                 <Download className="w-4 h-4" />
-                <span>Export CSV</span>
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+              <button
+                onClick={printReport}
+                className="flex items-center space-x-2 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
+                title="Print report"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden sm:inline">Print</span>
               </button>
               <button
                 onClick={shareResults}
                 className="flex items-center space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                title="Share result"
               >
                 <Share2 className="w-4 h-4" />
-                <span>Share</span>
+                <span className="hidden sm:inline">Share</span>
               </button>
             </div>
           </div>
@@ -1544,6 +1602,9 @@ your_data <- your_data |>
           </div>
         </div>
 
+        {/* Embed widget */}
+        <EmbedWidget />
+
         {/* Collaboration */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Collaboration &amp; Feedback</h3>
@@ -1574,6 +1635,9 @@ your_data <- your_data |>
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen grain-bg" style={{ backgroundColor: 'var(--color-cream)' }}>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-white focus:text-green-700 focus:rounded-lg focus:shadow-lg">
+        Skip to content
+      </a>
       {/* Header */}
       <header className="sticky top-0 z-50" style={{ backgroundColor: 'var(--color-forest)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1681,7 +1745,7 @@ your_data <- your_data |>
         )}
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search — hidden on static pages */}
         <div className={`mb-6 ${['about', 'methodology', 'researchers', 'batch', 'statemap'].includes(activeView) ? 'hidden' : ''}`}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5">
@@ -1691,9 +1755,10 @@ your_data <- your_data |>
                 <input
                   type="text"
                   placeholder="Enter city, county, or ZIP code…"
+                  aria-label="Search for a location"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery).catch(() => {})}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery).catch(() => {})}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 rounded-xl focus:ring-2 focus:border-transparent outline-none transition-shadow"
                   style={{ '--tw-ring-color': 'var(--color-sage)' }}
                 />
@@ -1734,17 +1799,30 @@ your_data <- your_data |>
             )}
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {['Jonesboro, AR', 'Jasper, AR', 'Billings, MT', 'Orange County, CA', 'Travis County, TX', 'Story County, IA'].map((place) => (
+              {(recentSearches.length > 0
+                ? recentSearches.map(r => r.query)
+                : ['Jonesboro, AR', 'Jasper, AR', 'Billings, MT', 'Orange County, CA', 'Travis County, TX', 'Story County, IA']
+              ).map((place) => (
                 <button
                   key={place}
                   onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
                   disabled={loading}
-                  className="px-3 py-1 text-sm text-slate-600 hover:text-slate-800 rounded-full transition-colors border border-slate-200 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full transition-colors border border-slate-200 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-50"
                 >
                   {place}
                 </button>
               ))}
             </div>
+            {recentSearches.length > 0 && (
+              <div className="mt-1 text-right">
+                <button
+                  onClick={() => { setRecentSearches([]); try { localStorage.removeItem('rurality-recent'); } catch {} }}
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  Clear recent
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
