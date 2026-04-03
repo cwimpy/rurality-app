@@ -1202,11 +1202,28 @@ const RuralityApp = () => {
       });
     };
 
-    const CodeBlock = ({ code }) => (
-      <pre className="bg-slate-900 text-green-300 text-xs rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre">
-        {code.trim()}
-      </pre>
-    );
+    const CodeBlock = ({ code }) => {
+      const [copied, setCopied] = React.useState(false);
+      const handleCopy = () => {
+        navigator.clipboard.writeText(code.trim()).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        });
+      };
+      return (
+        <div className="relative group">
+          <pre className="bg-slate-900 text-green-300 text-xs rounded-xl p-4 pr-16 overflow-x-auto leading-relaxed whitespace-pre">
+            {code.trim()}
+          </pre>
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 px-2 py-1 text-xs rounded-md transition-all bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white opacity-0 group-hover:opacity-100"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      );
+    };
 
     return (
       <div className="space-y-6">
@@ -1442,7 +1459,10 @@ your_data <- your_data |>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
               <div>
                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">R Package</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">devtools::install_github("cwimpy/rurality")</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono flex items-center gap-2">
+                  <code>devtools::install_github("cwimpy/rurality")</code>
+                  <button onClick={() => { navigator.clipboard.writeText('devtools::install_github("cwimpy/rurality")'); }} className="text-green-600 hover:text-green-800 text-[10px] underline">copy</button>
+                </p>
               </div>
               <a href="https://github.com/cwimpy/rurality" target="_blank" rel="noopener noreferrer"
                 className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
@@ -1454,7 +1474,10 @@ your_data <- your_data |>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
               <div>
                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Stata Package</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono flex items-center gap-2">
+                  <code>net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")</code>
+                  <button onClick={() => { navigator.clipboard.writeText('net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")'); }} className="text-green-600 hover:text-green-800 text-[10px] underline">copy</button>
+                </p>
               </div>
               <a href="https://github.com/cwimpy/rurality-stata" target="_blank" rel="noopener noreferrer"
                 className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
