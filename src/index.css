@@ -26,6 +26,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-cream);
+  color: #1e293b;
+}
+
+.dark body,
+.dark {
+  color: #e2e8f0;
 }
 
 h1, h2, h3, h4 {

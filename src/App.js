@@ -422,7 +422,7 @@ const RuralityApp = () => {
     );
 
     const IndexCard = ({ title, badge, badgeColor, code, description, score, footnote }) => (
-      <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col gap-2">
+      <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{title}</span>
           {badge && (
@@ -434,12 +434,12 @@ const RuralityApp = () => {
         {code !== null && code !== undefined ? (
           <>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-800">{code}</span>
+              <span className="text-3xl font-bold text-slate-800 dark:text-slate-100">{code}</span>
               {score !== null && score !== undefined && (
-                <span className="text-xs text-slate-500">score {score}/100</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">score {score}/100</span>
               )}
             </div>
-            <p className="text-sm text-slate-600 leading-snug">{description}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{description}</p>
             {score !== null && score !== undefined && <ScoreBar score={score} />}
           </>
         ) : (
@@ -457,10 +457,10 @@ const RuralityApp = () => {
       : 'text-red-700 bg-red-100 border-red-300';
 
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-slate-800">Official Rurality Classifications</h3>
+            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Official Rurality Classifications</h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {countyName ? `${countyName} County` : ''}
               {postcode ? ` · ZIP ${postcode}` : ''}
@@ -504,7 +504,7 @@ const RuralityApp = () => {
             score={null}
             footnote="Office of Management & Budget metro/nonmetro classification"
           />
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col gap-2">
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Composite RRI</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${compositeColor}`}>
@@ -512,10 +512,10 @@ const RuralityApp = () => {
               </span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-800">{compositeScore}</span>
-              <span className="text-xs text-slate-500">/ 100</span>
+              <span className="text-3xl font-bold text-slate-800 dark:text-slate-100">{compositeScore}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">/ 100</span>
             </div>
-            <p className="text-sm text-slate-600 leading-snug">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">
               Weighted hybrid index combining RUCA, population density, distance to metro, and broadband access.
             </p>
             <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
@@ -575,12 +575,12 @@ const RuralityApp = () => {
 
   const MapView = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-4">
-        <h3 className="text-xl font-bold text-slate-800">Interactive Map</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-4">
+        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Interactive Map</h3>
         <p className="text-sm text-slate-500 mt-1">Click anywhere on the map to analyze that location's rurality.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 overflow-hidden">
         <div className="h-[28rem] sm:h-[32rem]">
           <LeafletMap
             coordinates={ruralityData?.coordinates || null}
@@ -595,7 +595,7 @@ const RuralityApp = () => {
             {[['3,143', 'US Counties'], ['RUCA 2020', 'Classification'], ['6+', 'Data Sources'], ['Free', 'Open Access']].map(([val, lbl]) => (
               <div key={lbl}>
                 <div className="text-lg font-bold text-green-700">{val}</div>
-                <div className="text-xs text-slate-600">{lbl}</div>
+                <div className="text-xs text-slate-600 dark:text-slate-300">{lbl}</div>
               </div>
             ))}
           </div>
@@ -617,7 +617,7 @@ const RuralityApp = () => {
             const pct = Math.max(4, Math.round(((d[valueKey] - min) / range) * 100));
             return (
               <div key={d.year} className="flex flex-col items-center flex-1 gap-1">
-                <div className="text-xs font-semibold text-slate-600">{formatVal(d[valueKey])}</div>
+                <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{formatVal(d[valueKey])}</div>
                 <div
                   className={`w-full rounded-t-md ${color}`}
                   style={{ height: `${pct}%`, minHeight: '4px' }}
@@ -641,27 +641,27 @@ const RuralityApp = () => {
 
     if (!locationMeta) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
           <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">Search for a location to view historical trends</p>
+          <p className="text-slate-500 dark:text-slate-400">Search for a location to view historical trends</p>
         </div>
       );
     }
 
     if (trendsLoading) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full mx-auto mb-4" />
-          <p className="text-slate-500">Loading 2018–2022 Census ACS data…</p>
+          <p className="text-slate-500 dark:text-slate-400">Loading 2018–2022 Census ACS data…</p>
         </div>
       );
     }
 
     if (!trendsData || trendsData.length === 0) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
           <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">Could not load historical data for this county.</p>
+          <p className="text-slate-500 dark:text-slate-400">Could not load historical data for this county.</p>
         </div>
       );
     }
@@ -669,10 +669,10 @@ const RuralityApp = () => {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl font-bold text-slate-800">County Trends — {currentLocation}</h3>
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">County Trends — {currentLocation}</h3>
               <p className="text-sm text-slate-500 mt-0.5">
                 US Census Bureau ACS 5-Year Estimates · {trendsData[0].year}–{trendsData[trendsData.length - 1].year}
               </p>
@@ -699,12 +699,12 @@ const RuralityApp = () => {
         {/* Three metric charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Population */}
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-5">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
             <div className="flex items-center justify-between mb-1">
               <h4 className="text-sm font-bold text-slate-700">Population</h4>
               <Building2 className="w-4 h-4 text-green-500" />
             </div>
-            <div className="text-2xl font-bold text-slate-800 mb-0.5">
+            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
               {trendsData[trendsData.length - 1].population.toLocaleString()}
             </div>
             <div className="text-xs text-slate-500 mb-4">
@@ -719,12 +719,12 @@ const RuralityApp = () => {
           </div>
 
           {/* Median Income */}
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-5">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
             <div className="flex items-center justify-between mb-1">
               <h4 className="text-sm font-bold text-slate-700">Median Household Income</h4>
               <DollarSign className="w-4 h-4 text-blue-500" />
             </div>
-            <div className="text-2xl font-bold text-slate-800 mb-0.5">
+            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
               ${trendsData[trendsData.length - 1].medianIncome.toLocaleString()}
             </div>
             <div className="text-xs text-slate-500 mb-4">
@@ -739,12 +739,12 @@ const RuralityApp = () => {
           </div>
 
           {/* Unemployment */}
-          <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-5">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
             <div className="flex items-center justify-between mb-1">
               <h4 className="text-sm font-bold text-slate-700">Unemployment Rate</h4>
               <Zap className="w-4 h-4 text-orange-500" />
             </div>
-            <div className="text-2xl font-bold text-slate-800 mb-0.5">
+            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
               {trendsData[trendsData.length - 1].unemploymentRate}%
             </div>
             <div className="text-xs text-slate-500 mb-4">
@@ -760,16 +760,16 @@ const RuralityApp = () => {
         </div>
 
         {/* Raw data table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h4 className="text-base font-bold text-slate-800 mb-4">Annual Data Table</h4>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">Annual Data Table</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 pr-4 text-slate-600 font-semibold">Year</th>
-                  <th className="text-right py-2 px-4 text-slate-600 font-semibold">Population</th>
-                  <th className="text-right py-2 px-4 text-slate-600 font-semibold">Median Income</th>
-                  <th className="text-right py-2 pl-4 text-slate-600 font-semibold">Unemployment</th>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left py-2 pr-4 text-slate-600 dark:text-slate-400 font-semibold">Year</th>
+                  <th className="text-right py-2 px-4 text-slate-600 dark:text-slate-400 font-semibold">Population</th>
+                  <th className="text-right py-2 px-4 text-slate-600 dark:text-slate-400 font-semibold">Median Income</th>
+                  <th className="text-right py-2 pl-4 text-slate-600 dark:text-slate-400 font-semibold">Unemployment</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -797,7 +797,7 @@ const RuralityApp = () => {
   const AboutView = () => (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-8">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
         <div className="flex items-center space-x-4 mb-6">
           <img
             src={`${process.env.PUBLIC_URL}/logo.svg`}
@@ -805,7 +805,7 @@ const RuralityApp = () => {
             className="w-14 h-14 flex-shrink-0"
           />
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">About Rurality.app</h2>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">About Rurality.app</h2>
             <p className="text-slate-500 text-sm mt-0.5">Rural classification · Real government data · Open access</p>
           </div>
         </div>
@@ -826,23 +826,23 @@ const RuralityApp = () => {
       </div>
 
       {/* Author */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Users className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800">Author</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Author</h3>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-2xl">C</span>
           </div>
           <div>
-            <div className="text-lg font-semibold text-slate-800">Cameron Wimpy</div>
-            <div className="text-sm text-slate-600 mb-2">
+            <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">Cameron Wimpy</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
               Associate Professor &amp; Department Chair, Government, Law &amp; Policy<br />
               Director, Institute for Rural Initiatives<br />
               Arkansas State University
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               Cameron's research focuses on election administration, political methodology, and rural
               public policy. His current work examines how rurality affects outcomes in election
               administration and the voter experience.
@@ -863,10 +863,10 @@ const RuralityApp = () => {
       </div>
 
       {/* Data sources */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Database className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800">Data Sources</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Data Sources</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
@@ -910,7 +910,7 @@ const RuralityApp = () => {
               >
                 <ExternalLink className="w-3.5 h-3.5 text-green-600 mt-0.5 flex-shrink-0 group-hover:text-green-800" />
                 <div>
-                  <div className="text-sm font-semibold text-slate-800 group-hover:text-green-800">{name}</div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-green-800">{name}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{detail}</div>
                 </div>
               </a>
@@ -920,10 +920,10 @@ const RuralityApp = () => {
       </div>
 
       {/* Open source / limitations */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Scale className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800">Limitations &amp; Caveats</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Limitations &amp; Caveats</h3>
         </div>
         <ul className="space-y-2 text-sm text-slate-700">
           {[
@@ -948,10 +948,10 @@ const RuralityApp = () => {
   const MethodologyView = () => (
     <div className="space-y-6">
       {/* Overview */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-8">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
         <div className="flex items-center space-x-3 mb-4">
           <FlaskConical className="w-6 h-6 text-green-600" />
-          <h2 className="text-2xl font-bold text-slate-800">Methodology</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Methodology</h2>
         </div>
         <p className="text-slate-700 leading-relaxed mb-4">
           The <strong>Rurality Index (RRI)</strong> is a composite 0–100 score where higher values
@@ -959,26 +959,26 @@ const RuralityApp = () => {
           datasets. Weights adapt based on data availability, with RUCA serving as the anchor when
           a ZIP code can be matched to the USDA dataset.
         </p>
-        <div className="bg-green-50 rounded-xl p-4 border border-green-100 text-sm text-slate-600">
-          <strong className="text-slate-800">Interpretation:</strong> A score of 0 represents maximum
+        <div className="bg-green-50 rounded-xl p-4 border border-green-100 text-sm text-slate-600 dark:text-slate-300">
+          <strong className="text-slate-800 dark:text-slate-100">Interpretation:</strong> A score of 0 represents maximum
           urban density; 100 represents maximum remoteness. Classifications are:
           Very Rural (≥80) · Rural (≥60) · Mixed (≥40) · Suburban (≥20) · Urban (&lt;20).
         </div>
       </div>
 
       {/* Weights */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Calculator className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800">Component Weights</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Component Weights</h3>
         </div>
-        <p className="text-sm text-slate-600 mb-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
           Weights shift depending on which data are available for a given location.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
                 <th className="text-left py-2 pr-4 text-slate-700 font-semibold">Scenario</th>
                 <th className="text-center py-2 px-3 text-slate-700 font-semibold">RUCA</th>
                 <th className="text-center py-2 px-3 text-slate-700 font-semibold">Pop. Density</th>
@@ -1009,9 +1009,9 @@ const RuralityApp = () => {
       {/* Components */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* RUCA */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h3 className="text-base font-bold text-slate-800 mb-2">1. RUCA Code (ZIP level)</h3>
-          <p className="text-sm text-slate-600 mb-3">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">1. RUCA Code (ZIP level)</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
             The USDA Rural-Urban Commuting Area (RUCA) code is the gold standard for ZIP-level
             rural classification. It uses Census commuting flow data to categorize ZIP Code
             Tabulation Areas (ZCTAs) by their integration with urban cores.
@@ -1019,10 +1019,10 @@ const RuralityApp = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-1 pr-2 text-slate-600">Code</th>
-                  <th className="text-left py-1 pr-2 text-slate-600">Description</th>
-                  <th className="text-center py-1 text-slate-600">Score</th>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Code</th>
+                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Description</th>
+                  <th className="text-center py-1 text-slate-600 dark:text-slate-300">Score</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -1038,7 +1038,7 @@ const RuralityApp = () => {
                   [9,'Small town — low commuting',84],
                   [10,'Rural — no significant urban commuting',95],
                 ].map(([code, desc, score]) => (
-                  <tr key={code} className="text-slate-600">
+                  <tr key={code} className="text-slate-600 dark:text-slate-300">
                     <td className="py-1 pr-2 font-mono font-semibold">{code}</td>
                     <td className="py-1 pr-2">{desc}</td>
                     <td className="py-1 text-center text-green-700 font-semibold">{score}</td>
@@ -1050,9 +1050,9 @@ const RuralityApp = () => {
         </div>
 
         {/* RUCC */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h3 className="text-base font-bold text-slate-800 mb-2">2. RUCC Code (County level)</h3>
-          <p className="text-sm text-slate-600 mb-3">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">2. RUCC Code (County level)</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
             The USDA Rural-Urban Continuum Code (RUCC) classifies US counties on a 1–9 scale.
             It is the basis for the OMB Metropolitan/Micropolitan/Nonmetro designation shown in
             the classifications panel. RUCC is displayed for reference and OMB derivation; it
@@ -1061,10 +1061,10 @@ const RuralityApp = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-1 pr-2 text-slate-600">Code</th>
-                  <th className="text-left py-1 pr-2 text-slate-600">Description</th>
-                  <th className="text-center py-1 text-slate-600">OMB</th>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Code</th>
+                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Description</th>
+                  <th className="text-center py-1 text-slate-600 dark:text-slate-300">OMB</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -1079,7 +1079,7 @@ const RuralityApp = () => {
                   [8,'Completely rural, adjacent','Nonmetro'],
                   [9,'Completely rural, not adjacent','Nonmetro'],
                 ].map(([code, desc, omb]) => (
-                  <tr key={code} className="text-slate-600">
+                  <tr key={code} className="text-slate-600 dark:text-slate-300">
                     <td className="py-1 pr-2 font-mono font-semibold">{code}</td>
                     <td className="py-1 pr-2" dangerouslySetInnerHTML={{ __html: desc }} />
                     <td className={`py-1 text-center text-xs font-semibold ${
@@ -1093,36 +1093,36 @@ const RuralityApp = () => {
         </div>
 
         {/* Population density */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h3 className="text-base font-bold text-slate-800 mb-2">3. Population Density</h3>
-          <p className="text-sm text-slate-600 mb-3">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">3. Population Density</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
             County population (ACS 2022) divided by land area in square miles (Census TIGER via
             Census Geocoder). The score is log-transformed so that extremely dense urban cores
             don't compress variation across rural and suburban areas.
           </p>
-          <div className="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-700">
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-300">
             score = 100 − log₁₀(density) × 25<br />
             <span className="text-slate-400">clamped to [0, 100]</span>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center text-slate-600">
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center text-slate-600 dark:text-slate-300">
             {[['1/sq mi','≈100'],['100/sq mi','≈70'],['1,000/sq mi','≈45'],['10,000/sq mi','≈20'],['27,000/sq mi','0']].map(([d,s])=>(
               <div key={d} className="bg-green-50 rounded p-2 border border-green-100">
                 <div className="font-semibold text-slate-700">{s}</div>
-                <div className="text-slate-500">{d}</div>
+                <div className="text-slate-500 dark:text-slate-400">{d}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Distance */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h3 className="text-base font-bold text-slate-800 mb-2">4. Distance to Metro</h3>
-          <p className="text-sm text-slate-600 mb-3">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">4. Distance to Metro</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
             Haversine distance from the queried coordinates to the nearest metro area in each of
             three size tiers (large ≥1M, medium 250K–1M, small 50K–250K). The three distances
             are combined into a single score with differential weights.
           </p>
-          <div className="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-700 space-y-1">
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-300 space-y-1">
             <div>large  = min(100, distance_mi / 2) &nbsp;&nbsp;× 0.50</div>
             <div>medium = min(100, distance_mi / 1.5) × 0.30</div>
             <div>small  = min(100, distance_mi) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;× 0.20</div>
@@ -1136,10 +1136,10 @@ const RuralityApp = () => {
       </div>
 
       {/* References */}
-      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <BookOpen className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800">Key References</h3>
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Key References</h3>
         </div>
         <ul className="space-y-3 text-sm text-slate-700">
           {[
@@ -1212,10 +1212,10 @@ const RuralityApp = () => {
       <div className="space-y-6">
 
         {/* Hero */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-8">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
           <div className="flex items-center space-x-3 mb-3">
             <BookOpen className="w-6 h-6 text-green-600" />
-            <h2 className="text-2xl font-bold text-slate-800">For Researchers</h2>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">For Researchers</h2>
           </div>
           <p className="text-slate-600 leading-relaxed max-w-3xl">
             Rurality.app is built on publicly available federal datasets and a transparent
@@ -1226,13 +1226,13 @@ const RuralityApp = () => {
         </div>
 
         {/* Citation */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
             <Scale className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800">How to Cite</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">How to Cite</h3>
           </div>
           <p className="text-sm text-slate-500 mb-3">APA 7th edition</p>
-          <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
             <p className="flex-1 text-sm text-slate-700 font-mono leading-relaxed">{citation}</p>
             <button
               onClick={copyCitation}
@@ -1248,10 +1248,10 @@ const RuralityApp = () => {
         </div>
 
         {/* Suggested uses */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
             <Users className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800">Suggested Uses</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Suggested Uses</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
@@ -1265,7 +1265,7 @@ const RuralityApp = () => {
               <div key={title} className="flex items-start space-x-3 p-4 bg-green-50 rounded-xl border border-green-100">
                 <span className="text-green-500 font-bold flex-shrink-0 mt-0.5">·</span>
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">{title}</div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
                   <div className="text-xs text-slate-600 mt-0.5 leading-relaxed">{desc}</div>
                 </div>
               </div>
@@ -1274,10 +1274,10 @@ const RuralityApp = () => {
         </div>
 
         {/* R replication */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-2">
             <Calculator className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800">Replicating the Score in R</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Replicating the Score in R</h3>
           </div>
           <p className="text-sm text-slate-500 mb-5">
             The composite Rural Index can be replicated entirely in R using the same USDA and
@@ -1414,10 +1414,10 @@ your_data <- your_data |>
         </div>
 
         {/* Data sources with download links */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
             <Database className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800">Data Sources &amp; Downloads</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Data Sources &amp; Downloads</h3>
           </div>
           <div className="space-y-3">
             {[
@@ -1450,10 +1450,10 @@ your_data <- your_data |>
                 fileLabel: null
               },
             ].map(({ name, desc, page, file, fileLabel }) => (
-              <div key={name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div key={name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
                 <div>
                   <a href={page} target="_blank" rel="noopener noreferrer"
-                    className="text-sm font-semibold text-slate-800 hover:text-slate-900 transition-colors flex items-center gap-1">
+                    className="text-sm font-semibold text-slate-800 dark:text-slate-100 hover:text-slate-900 transition-colors flex items-center gap-1">
                     {name} <ExternalLink className="w-3 h-3" />
                   </a>
                   <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
@@ -1470,9 +1470,9 @@ your_data <- your_data |>
         </div>
 
         {/* Collaboration */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-2">Collaboration &amp; Feedback</h3>
-          <p className="text-sm text-slate-600 leading-relaxed mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Collaboration &amp; Feedback</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
             If you use Rurality.app in published research, we would love to hear about it.
             Bug reports, methodology suggestions, and data quality issues are tracked on GitHub.
           </p>
@@ -1619,7 +1619,7 @@ your_data <- your_data |>
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery).catch(() => {})}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:border-transparent outline-none transition-shadow"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 rounded-xl focus:ring-2 focus:border-transparent outline-none transition-shadow"
                   style={{ '--tw-ring-color': 'var(--color-sage)' }}
                 />
               </div>
@@ -1627,7 +1627,7 @@ your_data <- your_data |>
                 <button
                   onClick={getCurrentLocation}
                   disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors disabled:opacity-50"
+                  className="flex items-center space-x-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50"
                 >
                   <Navigation className="w-4 h-4" />
                   <span className="hidden sm:inline">GPS</span>
@@ -1652,7 +1652,7 @@ your_data <- your_data |>
             </div>
 
             {error && (
-              <div className="mt-4 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <div className="mt-4 flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span className="text-sm">{error}</span>
               </div>
@@ -1664,7 +1664,7 @@ your_data <- your_data |>
                   key={place}
                   onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
                   disabled={loading}
-                  className="px-3 py-1 text-sm text-slate-600 hover:text-slate-800 rounded-full transition-colors border border-slate-200 hover:border-slate-400 hover:bg-white disabled:opacity-50"
+                  className="px-3 py-1 text-sm text-slate-600 hover:text-slate-800 rounded-full transition-colors border border-slate-200 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-50"
                 >
                   {place}
                 </button>
@@ -1686,16 +1686,16 @@ your_data <- your_data |>
         {ruralityData && activeView === 'dashboard' && (
           <div className="space-y-6">
             {/* Overview */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{currentLocation}</h2>
+                  <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{currentLocation}</h2>
                   <div className="flex items-center space-x-4">
                     <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getRuralityLevel(ruralityData.overallScore).color}`}>
                       {getRuralityLevel(ruralityData.overallScore).level}
                     </div>
                     {ruralityData.demographics?.population > 0 && (
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
                         Population: {ruralityData.demographics.population.toLocaleString()}
                       </div>
                     )}
@@ -1708,7 +1708,7 @@ your_data <- your_data |>
                   <div className="text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-forest)' }}>
                     {ruralityData.overallScore}
                   </div>
-                  <div className="text-sm text-slate-500">Rural Index Score</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Rural Index Score</div>
                 </div>
               </div>
 
@@ -1717,7 +1717,7 @@ your_data <- your_data |>
                 {Object.entries(ruralityData.metrics).map(([key, metric]) => {
                   const Icon = metric.icon;
                   return (
-                    <div key={key} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
+                    <div key={key} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700 shadow-sm">
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--color-parchment)' }}>
                           <Icon className="w-4 h-4" style={{ color: 'var(--color-sage)' }} />
@@ -1727,7 +1727,7 @@ your_data <- your_data |>
                           <div className="text-xs font-medium" style={{ color: 'var(--color-sage)' }}>{metric.score}/100</div>
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-slate-800 mb-2">
+                      <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">
                         {typeof metric.value === 'number' && metric.value % 1 !== 0
                           ? metric.value.toFixed(1) : metric.value}
                       </div>
@@ -1744,7 +1744,7 @@ your_data <- your_data |>
 
               {/* Demographics */}
               {ruralityData.demographics && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl">
                   {[
                     { value: ruralityData.demographics.medianAge, label: 'Median Age' },
                     { value: ruralityData.demographics.medianIncome
@@ -1757,7 +1757,7 @@ your_data <- your_data |>
                   ].map(({ value, label, highlight }) => (
                     <div key={label} className="text-center">
                       <div className={`text-lg font-bold ${highlight ? 'text-green-600' : 'text-slate-800'}`}>{value}</div>
-                      <div className="text-xs text-slate-600">{label}</div>
+                      <div className="text-xs text-slate-600 dark:text-slate-300">{label}</div>
                     </div>
                   ))}
                 </div>
@@ -1801,8 +1801,8 @@ your_data <- your_data |>
 
             {/* Comparison */}
             {comparisonData.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
-                <h3 className="text-xl font-bold text-slate-800 mb-6">Location Comparison</h3>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">Location Comparison</h3>
                 <div className="space-y-4">
                   {comparisonData.map((item) => {
                     const level = item.score !== null
@@ -1811,7 +1811,7 @@ your_data <- your_data |>
                     return (
                       <div key={item.name} className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
                         <div className="flex items-center space-x-4">
-                          <div className="text-lg font-semibold text-slate-800">{item.name}</div>
+                          <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{item.name}</div>
                           <div className={`px-2 py-1 rounded-full text-xs font-medium border ${level.color}`}>
                             {item.loading ? 'Loading…' : level.level}
                           </div>
@@ -1873,14 +1873,14 @@ your_data <- your_data |>
                 <button
                   key={place}
                   onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
-                  className="bg-white rounded-xl shadow-sm p-5 text-left hover:shadow-md transition-shadow group cursor-pointer border border-transparent hover:border-slate-200"
+                  className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 text-left hover:shadow-md transition-shadow group cursor-pointer border border-transparent hover:border-slate-200"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-2xl">{emoji}</span>
                     <span className="text-3xl font-bold" style={{ color, fontFamily: 'var(--font-display)' }}>{score}</span>
                   </div>
-                  <div className="font-semibold text-slate-800 group-hover:text-slate-900">{place}</div>
-                  <div className="text-sm text-slate-500">{level}</div>
+                  <div className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-slate-900">{place}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">{level}</div>
                 </button>
               ))}
             </div>
@@ -1895,7 +1895,7 @@ your_data <- your_data |>
                 <div key={title} className="flex items-start space-x-3 p-4 rounded-xl" style={{ backgroundColor: 'var(--color-parchment)' }}>
                   <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-sage)' }} />
                   <div>
-                    <div className="font-semibold text-slate-800 text-sm">{title}</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{title}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
                   </div>
                 </div>
@@ -1906,7 +1906,7 @@ your_data <- your_data |>
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-12">
+      <footer className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-4">
@@ -1917,10 +1917,10 @@ your_data <- your_data |>
               />
               <div>
                 <div className="text-sm font-medium text-slate-700">Built by Cameron Wimpy</div>
-                <div className="text-xs text-slate-500">Powered by US Census Bureau, USDA ERS, and FCC data</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Powered by US Census Bureau, USDA ERS, and FCC data</div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-2 text-sm text-slate-600">
+            <div className="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
               <button
                 onClick={() => { setActiveView('about'); window.scrollTo(0, 0); }}
                 className="hover:text-slate-900 transition-colors"
@@ -1947,7 +1947,7 @@ your_data <- your_data |>
               >GitHub</a>
             </div>
           </div>
-          <div className="mt-6 pt-6 border-t border-green-100 text-center text-xs text-slate-500">
+          <div className="mt-6 pt-6 border-t border-green-100 text-center text-xs text-slate-500 dark:text-slate-400">
             <p>© 2026 Rurality.app • Data from US Census Bureau ACS, USDA ERS RUCA, and USDA ERS RUCC • Not for regulatory use</p>
           </div>
         </div>
@@ -1956,12 +1956,12 @@ your_data <- your_data |>
       {/* Info panel — toggleable */}
       <div className="fixed bottom-4 right-4 z-40">
         {showDataSources ? (
-          <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4 max-w-xs">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 p-4 max-w-xs">
             <div className="flex items-start space-x-3">
               <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-sage)' }} />
               <div className="text-sm flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="font-medium text-slate-800">Live Data Sources</div>
+                  <div className="font-medium text-slate-800 dark:text-slate-100">Live Data Sources</div>
                   <button onClick={() => setShowDataSources(false)} className="text-slate-400 hover:text-slate-600 ml-2">
                     <X className="w-4 h-4" />
                   </button>
@@ -1978,7 +1978,7 @@ your_data <- your_data |>
         ) : (
           <button
             onClick={() => setShowDataSources(true)}
-            className="bg-white rounded-full shadow-lg border border-slate-200 p-3 hover:bg-slate-50 transition-colors"
+            className="bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             title="Live Data Sources"
           >
             <Info className="w-5 h-5" style={{ color: 'var(--color-sage)' }} />
