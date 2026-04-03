@@ -7,7 +7,7 @@ export default function DarkModeToggle() {
       if (typeof window === 'undefined') return false;
       const saved = localStorage.getItem('rurality-dark-mode');
       if (saved !== null) return saved === 'true';
-      return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+      return false;
     } catch {
       return false;
     }
