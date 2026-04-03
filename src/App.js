@@ -1413,6 +1413,58 @@ your_data <- your_data |>
           </div>
         </div>
 
+        {/* Download data for analysis */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <div className="flex items-center space-x-3 mb-2">
+            <Download className="w-5 h-5 text-green-600" />
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Download Data</h3>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+            Pre-computed rurality scores for all 3,235 U.S. counties, ready to merge into your analysis by FIPS code.
+            Includes RUCC 2023, population density, distance to metro areas, composite score, and ACS demographics.
+          </p>
+
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+              <div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">County Rurality Dataset (CSV)</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">3,235 counties, 24 variables, ~500KB</p>
+              </div>
+              <a href={`${process.env.PUBLIC_URL}/data/county_rurality.csv`}
+                download="county_rurality.csv"
+                className="flex-shrink-0 flex items-center space-x-2 px-4 py-2 text-white rounded-lg text-sm transition-colors"
+                style={{ backgroundColor: 'var(--color-forest)' }}>
+                <Download className="w-4 h-4" />
+                <span>Download CSV</span>
+              </a>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
+              <div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">R Package</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">devtools::install_github("cwimpy/rurality")</p>
+              </div>
+              <a href="https://github.com/cwimpy/rurality" target="_blank" rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <span>GitHub</span>
+              </a>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
+              <div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Stata Package</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")</p>
+              </div>
+              <a href="https://github.com/cwimpy/rurality-stata" target="_blank" rel="noopener noreferrer"
+                className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <span>GitHub</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Data sources with download links */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
