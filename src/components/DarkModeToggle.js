@@ -3,10 +3,14 @@ import { Moon, Sun } from 'lucide-react';
 
 export default function DarkModeToggle() {
   const [dark, setDark] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const saved = localStorage.getItem('rurality-dark-mode');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    try {
+      if (typeof window === 'undefined') return false;
+      const saved = localStorage.getItem('rurality-dark-mode');
+      if (saved !== null) return saved === 'true';
+      return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
@@ -16,7 +20,7 @@ export default function DarkModeToggle() {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('rurality-dark-mode', String(dark));
+    try { localStorage.setItem('rurality-dark-mode', String(dark)); } catch {}
   }, [dark]);
 
   return (
