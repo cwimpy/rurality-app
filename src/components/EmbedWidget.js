@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Code, ExternalLink } from 'lucide-react';
+import { Code } from 'lucide-react';
 
 export default function EmbedWidget() {
   const [location, setLocation] = useState('Jonesboro, AR');
