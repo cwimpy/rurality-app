@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: "Rurality.app: Rurality Classification and Scoring for U.S. Locations"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: Cameron
+    family-names: Wimpy
+    email: cwimpy@astate.edu
+    affiliation: "Arkansas State University"
+    orcid: "https://orcid.org/0000-0002-2049-5229"
+repository-code: "https://github.com/cwimpy/rurality-app"
+url: "https://rurality.app"
+abstract: >-
+  A web application and research tool for classifying the rurality of any
+  U.S. location using USDA Rural-Urban Commuting Area codes (RUCA 2020),
+  Rural-Urban Continuum Codes (RUCC 2023), Census demographics, and
+  distance to metropolitan areas. Produces a composite rurality score
+  (0-100) with classifications from Urban to Very Rural. Includes
+  companion R and Stata packages for programmatic access.
+keywords:
+  - rurality
+  - rural-urban classification
+  - RUCA
+  - RUCC
+  - election administration
+  - rural policy
+  - Census data
+  - computational social science
+license: MIT
+version: 1.0.0
+date-released: "2026-04-03"
