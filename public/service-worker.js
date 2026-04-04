@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rurality-v2';
+const CACHE_NAME = 'rurality-v3';
 const DATA_ASSETS = [
   '/data/ruca.json',
   '/data/rucc.json'

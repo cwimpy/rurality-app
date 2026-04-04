@@ -1643,7 +1643,7 @@ your_data <- your_data |>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <button
-              onClick={() => { setActiveView('dashboard'); setMenuOpen(false); window.scrollTo(0, 0); }}
+              onClick={() => { setActiveView('dashboard'); setMenuOpen(false); setRuralityData(null); setSearchQuery(''); setCurrentLocation(''); setError(''); window.history.replaceState({}, '', window.location.pathname); window.scrollTo(0, 0); }}
               className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
             >
               <img
