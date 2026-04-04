@@ -65,7 +65,9 @@ Classifications: Urban (0-19), Suburban (20-39), Mixed (40-59), Rural (60-79), V
 
 ## TODO — Next Features
 
-### Research Data Tools (High Priority)
+### Research (High Priority)
+- [ ] Validated rurality index — move from composite score to a validated measurement instrument using factor analysis, convergent/discriminant validity testing against RUCC/RUCA/NCHS, and criterion validation against substantive outcomes (health access, election administration, broadband). This is the academic contribution that distinguishes the index from existing classifications.
+- [ ] Academic paper — methodology paper documenting the index construction, validation, and comparison with existing measures. Target journals: Political Analysis, Social Science Quarterly, or a methods-focused journal. Structure: motivation (existing measures weren't built for election admin / policy), index construction, validation, application.
 - [ ] API endpoint — REST API (Netlify Function) returning JSON rurality scores by FIPS or location
 - [ ] EAVS integration — merge rurality scores with LEO Dashboard data
 - [ ] Data dictionary/codebook page — downloadable documentation of all variables
