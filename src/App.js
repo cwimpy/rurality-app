@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap, Wifi,
@@ -153,16 +153,7 @@ const RuralityApp = () => {
     loadRuccData().catch(() => {});
   }, []);
 
-  // URL routing: update URL when a search completes
-  const updateURL = useCallback((query) => {
-    const url = new URL(window.location);
-    if (query) {
-      url.searchParams.set('q', query);
-    } else {
-      url.searchParams.delete('q');
-    }
-    window.history.replaceState({}, '', url);
-  }, []);
+
 
   // Fetch trends when switching to the tab OR when locationMeta arrives while on the tab
   useEffect(() => {
