@@ -257,7 +257,6 @@ const RuralityApp = () => {
         countyData.countyName ||
         geoData.displayName.split(',')[0];
       setCurrentLocation(resolvedName);
-      updateURL(location);
 
       // Save to recent searches
       setRecentSearches(prev => {
