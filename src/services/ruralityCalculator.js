@@ -58,11 +58,11 @@ export function calculateRuralityScore({
   let weights, totalScore;
 
   if (rucaScore !== null && broadbandScore !== null) {
-    weights = { ruca: 0.50, density: 0.25, distance: 0.15, broadband: 0.10 };
+    weights = { ruca: 0.35, density: 0.30, distance: 0.20, broadband: 0.15 };
     totalScore = rucaScore * weights.ruca + densityScore * weights.density +
                  distanceScore * weights.distance + broadbandScore * weights.broadband;
   } else if (rucaScore !== null) {
-    weights = { ruca: 0.55, density: 0.25, distance: 0.20, broadband: 0.00 };
+    weights = { ruca: 0.40, density: 0.35, distance: 0.25, broadband: 0.00 };
     totalScore = rucaScore * weights.ruca + densityScore * weights.density +
                  distanceScore * weights.distance;
   } else if (broadbandScore !== null) {
@@ -138,8 +138,10 @@ export function calculateRuralityScore({
 
 function calcDensityScore(density) {
   if (density <= 0) return 100;
-  // Logarithmic: 1/sqmi → ~100, 100/sqmi → ~70, 1000/sqmi → ~45, 27000/sqmi → 0
-  const score = 100 - Math.log10(density) * 25;
+  // Log-linear curve calibrated for U.S. county density range:
+  // 1/sqmi → 100, 10/sqmi → 78, 50/sqmi → 62, 100/sqmi → 53,
+  // 500/sqmi → 32, 1000/sqmi → 22, 3000/sqmi → 7, 10000+/sqmi → 0
+  const score = 100 - Math.log10(density) * 22 - Math.pow(Math.log10(density), 1.8) * 3;
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
