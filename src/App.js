@@ -1745,6 +1745,16 @@ your_data <- your_data |>
         )}
       </header>
 
+      {/* Development notice */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <strong>Research tool in development.</strong> The composite Rural Index score is a working draft and has not yet been peer reviewed or formally validated. It should not be cited as a finalized measure. The underlying USDA RUCA codes, RUCC codes, and Census data are official federal datasets and may be used independently. We welcome <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-200">feedback</a>.
+          </div>
+        </div>
+      </div>
+
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search — hidden on static pages */}
         <div className={`mb-6 ${['about', 'methodology', 'researchers', 'batch', 'statemap'].includes(activeView) ? 'hidden' : ''}`}>
