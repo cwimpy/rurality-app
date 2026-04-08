@@ -2,6 +2,15 @@
   command = "npm run build"
   publish = "build"
 
+[functions]
+  directory = "netlify/functions"
+
+# API routes — must come before the SPA catch-all
+[[redirects]]
+  from = "/api/score"
+  to = "/.netlify/functions/score"
+  status = 200
+
 # Single-page app: redirect all routes back to index.html
 [[redirects]]
   from = "/*"

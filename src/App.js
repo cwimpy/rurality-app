@@ -12,6 +12,8 @@ import BatchLookup from './components/BatchLookup';
 import StateMap from './components/StateMap';
 import PlacesLikeThis from './components/PlacesLikeThis';
 import EmbedWidget from './components/EmbedWidget';
+import RUCCHistory from './components/RUCCHistory';
+import CompareTable from './components/CompareTable';
 
 import {
   geocodeWithCache,
@@ -330,10 +332,19 @@ const RuralityApp = () => {
     if (comparisonData.length >= 5) return;
     if (comparisonData.some(d => d.name === locationName)) return;
 
-    // If we already have the score (adding current location), skip the fetch
+    // If we already have the score (adding current location), use current data
     if (knownScore !== null) {
       const level = getRuralityLevel(knownScore).level;
-      setComparisonData(prev => [...prev, { name: locationName, score: knownScore, level, loading: false }]);
+      const rucc = locationMeta ? getRUCC(locationMeta.stateFips, locationMeta.countyFips) : null;
+      const density = ruralityData?.metrics?.populationDensity?.value ?? null;
+      const distanceToMetro = ruralityData?.metrics?.distanceToUrban?.value ?? null;
+      const ruccScore = rucc != null ? ruccToScore(rucc) : null;
+      const densityScore = ruralityData?.metrics?.populationDensity?.score ?? null;
+      const distanceScore = ruralityData?.metrics?.distanceToUrban?.score ?? null;
+      setComparisonData(prev => [...prev, {
+        name: locationName, score: knownScore, level, loading: false,
+        rucc, density, distanceToMetro, ruccScore, densityScore, distanceScore
+      }]);
       return;
     }
 
@@ -349,10 +360,19 @@ const RuralityApp = () => {
         ? censusData.totalPopulation / countyData.areaSqMiles : 0;
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca });
-      const { overallScore, classification } = calcResult;
+      const { overallScore, classification, components } = calcResult;
+      const rucc = getRUCC(countyData.stateFips, countyData.countyFips);
       setComparisonData(prev => prev.map(d =>
         d.name === locationName
-          ? { name: locationName, score: overallScore, level: classification.label, loading: false }
+          ? {
+              name: locationName, score: overallScore, level: classification.label, loading: false,
+              rucc,
+              density: populationDensity,
+              distanceToMetro: components.distance.nearestSmallMetro,
+              ruccScore: components.ruca?.score ?? null,
+              densityScore: components.populationDensity.score,
+              distanceScore: components.distance.score
+            }
           : d
       ));
     } catch {
@@ -1536,6 +1556,81 @@ your_data <- your_data |>
           </div>
         </div>
 
+        {/* REST API */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
+          <div className="flex items-center space-x-3 mb-2">
+            <Zap className="w-5 h-5 text-green-600" />
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">REST API</h3>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+            Query rurality scores programmatically. No authentication required. Returns JSON with RUCC codes,
+            composite scores, demographics, and score components for all 3,235 U.S. counties.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Endpoints</p>
+              <div className="space-y-2">
+                {[
+                  { label: 'Single county by FIPS', url: '/api/score?fips=05031' },
+                  { label: 'All counties in a state', url: '/api/score?state=AR' },
+                  { label: 'Search by county name', url: '/api/score?q=Craighead&limit=10' },
+                ].map(({ label, url }) => (
+                  <div key={url} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 sm:w-44 flex-shrink-0">{label}</span>
+                    <code className="text-xs text-green-700 dark:text-green-400 font-mono break-all">
+                      https://rurality.app{url}
+                    </code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Example in R</p>
+              <CodeBlock code={`library(httr2)
+library(jsonlite)
+
+# Get all Arkansas counties
+resp <- request("https://rurality.app/api/score") |>
+  req_url_query(state = "AR") |>
+  req_perform()
+
+ar <- fromJSON(resp_body_string(resp))$results
+
+# Merge onto your data by FIPS
+your_data <- your_data |>
+  left_join(ar, by = "fips")`} />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Example response</p>
+              <CodeBlock code={`{
+  "count": 1,
+  "results": [{
+    "fips": "05031",
+    "state": "AR",
+    "county": "Craighead County",
+    "population_2020": 114778,
+    "rucc_2023": 3,
+    "rurality_score": 40,
+    "classification": "Mixed",
+    "components": {
+      "rucc_score": 28,
+      "density_score": 46,
+      "distance_score": 98
+    }
+  }]
+}`} />
+            </div>
+
+            <p className="text-xs text-slate-400">
+              The API serves pre-computed county-level data. For ZIP-level RUCA lookups,
+              use the R or Stata packages above.
+            </p>
+          </div>
+        </div>
+
         {/* Data sources with download links */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
           <div className="flex items-center space-x-3 mb-4">
@@ -1952,40 +2047,17 @@ your_data <- your_data |>
               />
             )}
 
-            {/* Comparison */}
-            {comparisonData.length > 0 && (
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">Location Comparison</h3>
-                <div className="space-y-4">
-                  {comparisonData.map((item) => {
-                    const level = item.score !== null
-                      ? getRuralityLevel(item.score)
-                      : { level: item.level || '…', color: 'text-slate-600 bg-slate-100 border-slate-200' };
-                    return (
-                      <div key={item.name} className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-100">
-                        <div className="flex items-center space-x-4">
-                          <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{item.name}</div>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium border ${level.color}`}>
-                            {item.loading ? 'Loading…' : level.level}
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-2xl font-bold text-green-600">
-                            {item.loading ? '…' : item.score !== null ? item.score : '—'}
-                          </div>
-                          <button
-                            onClick={() => removeComparison(item.name)}
-                            className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* RUCC History */}
+            {locationMeta && (
+              <RUCCHistory fips={`${locationMeta.stateFips}${locationMeta.countyFips}`} />
             )}
+
+            {/* Comparison */}
+            <CompareTable
+              items={comparisonData}
+              onRemove={removeComparison}
+              getRuralityLevel={getRuralityLevel}
+            />
 
             {/* Places Like This */}
             {locationMeta && (
@@ -1993,7 +2065,7 @@ your_data <- your_data |>
                 currentFips={`${locationMeta.stateFips}${locationMeta.countyFips}`}
                 currentRucc={getRUCC(locationMeta.stateFips, locationMeta.countyFips)}
                 currentDensity={ruralityData?.metrics?.populationDensity?.value}
-                onSearch={(place) => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
+                onSearch={(place) => { setSearchQuery(place); window.scrollTo({ top: 0, behavior: 'smooth' }); handleLocationSearch(place).catch(() => {}); }}
               />
             )}
           </div>

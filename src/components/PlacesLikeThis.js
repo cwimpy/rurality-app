@@ -17,10 +17,18 @@ const STATE_NAMES = {
 export default function PlacesLikeThis({ currentFips, currentRucc, currentDensity, onSearch }) {
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadedForRucc, setLoadedForRucc] = useState(null);
 
   useEffect(() => {
     if (!currentFips || currentRucc === null || currentRucc === undefined) {
       setSimilar([]);
+      setLoading(false);
+      return;
+    }
+
+    // Only re-fetch when RUCC code changes, not when navigating between
+    // counties with the same classification
+    if (loadedForRucc === currentRucc && similar.length > 0) {
       setLoading(false);
       return;
     }
@@ -47,22 +55,22 @@ export default function PlacesLikeThis({ currentFips, currentRucc, currentDensit
         const shuffled = sameRucc.sort(() => Math.random() - 0.5);
         const sample = shuffled.slice(0, 8);
 
-        // Try to get county names from Census API for the sample
-        const withNames = await Promise.all(
-          sample.map(async (item) => {
-            try {
-              const url = `https://api.census.gov/data/2022/acs/acs5?get=NAME&for=county:${item.countyFips}&in=state:${item.stateFips}`;
-              const res = await fetch(url);
-              const json = await res.json();
-              const name = json[1]?.[0]?.replace(/, [A-Za-z]+$/, '') || `FIPS ${item.fips}`;
-              return { ...item, name };
-            } catch {
-              return { ...item, name: `County (${item.state})` };
-            }
-          })
-        );
+        // Load county names from the names JSON instead of Census API
+        let namesData = {};
+        try {
+          const namesRes = await fetch(`${process.env.PUBLIC_URL}/data/county_names.json`);
+          namesData = await namesRes.json();
+        } catch { /* fall back to FIPS */ }
+
+        const withNames = sample.map(item => ({
+          ...item,
+          name: namesData[item.fips]
+            ? `${namesData[item.fips]} County, ${item.state}`
+            : `County (${item.state})`
+        }));
 
         setSimilar(withNames);
+        setLoadedForRucc(currentRucc);
       } catch {
         setSimilar([]);
       }
@@ -70,6 +78,7 @@ export default function PlacesLikeThis({ currentFips, currentRucc, currentDensit
     }
 
     findSimilar();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFips, currentRucc, currentDensity]);
 
   if (loading) {
