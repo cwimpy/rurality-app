@@ -167,7 +167,7 @@ const SpecimenCardSVG = React.forwardRef(({ location, score, confidence, classif
       <g fontFamily="JetBrains Mono, monospace" fontSize="11" letterSpacing="3.2" fill="#4a7c59">
         <text x="72"   y="78" textAnchor="start">№ {cardNum}</text>
         <line x1="170" y1="74" x2="430" y2="74" stroke="#4a7c59" strokeOpacity="0.4" strokeWidth="1" />
-        <text x="600"  y="78" textAnchor="middle">RURALITY · FIELD SPECIMEN</text>
+        <text x="600"  y="78" textAnchor="middle">RURALITY · FIELD CARD</text>
         <line x1="770" y1="74" x2="1000" y2="74" stroke="#4a7c59" strokeOpacity="0.4" strokeWidth="1" />
         <text x="1128" y="78" textAnchor="end">EDITION 2026</text>
       </g>
@@ -347,7 +347,7 @@ export default function SpecimenCard({
 
       const safeName = (location || 'specimen').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       const link = document.createElement('a');
-      link.download = `rurality-specimen-${safeName}.png`;
+      link.download = `rurality-field-card-${safeName}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (e) {
@@ -361,7 +361,7 @@ export default function SpecimenCard({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Specimen card preview"
+      aria-label="Field card preview"
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 overflow-auto"
       style={{ backgroundColor: 'rgba(10, 20, 14, 0.82)' }}
       onClick={onClose}
@@ -369,7 +369,7 @@ export default function SpecimenCard({
       <div className="w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-wheat)' }}>
-            Specimen Card &middot; Preview
+            Field Card &middot; Preview
           </div>
           <button onClick={onClose}
                   className="text-white/70 hover:text-white p-1.5 rounded"

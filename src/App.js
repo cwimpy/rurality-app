@@ -402,7 +402,7 @@ const RuralityApp = () => {
       `§ FIELD REPORT · RURALITY.APP`,
       `──────────────────────────────`,
       `${currentLocation}`,
-      `Rural Index  ${ruralityData.overallScore}/100  ·  ${level}`,
+      `Rurality Index  ${ruralityData.overallScore}/100  ·  ${level}`,
       `Confidence   ${ruralityData.confidence}`,
       cls.rucc?.code != null ? `RUCC 2023    ${cls.rucc.code} — ${cls.rucc.description || ''}`.trim() : null,
       cls.ruca?.code != null ? `RUCA 2020    ${cls.ruca.code} — ${cls.ruca.description || ''}`.trim() : null,
@@ -433,7 +433,7 @@ const RuralityApp = () => {
     const rows = [
       ['Metric', 'Value', 'Score'],
       ['Location', currentLocation, ''],
-      ['Overall Rural Index', ruralityData.overallScore, ruralityData.overallScore],
+      ['Overall Rurality Index', ruralityData.overallScore, ruralityData.overallScore],
       ['Classification', getRuralityLevel(ruralityData.overallScore).level, ''],
       ['Confidence', ruralityData.confidence, ''],
       ['', '', ''],
@@ -1015,7 +1015,7 @@ const RuralityApp = () => {
       {/* ── The Map Plate ─────────────────────────────────────────── */}
       <section>
         <div className="fg-rule mb-5">
-          <span>The Plate</span>
+          <span>The Plate:</span>
           <span>Click to analyze &middot; Drag to pan &middot; Scroll to zoom</span>
         </div>
         <div className="rounded-lg overflow-hidden border"
@@ -1289,10 +1289,11 @@ const RuralityApp = () => {
     const limitations = [
       'RUCA codes are from 2020 and RUCC codes from 2023, based on 2020 Census data. Rural character can change; scores may not reflect the most recent development.',
       'Population density is calculated from 2022 ACS county totals divided by land area — it does not capture within-county variation.',
-      'The composite Rural Index is a research tool, not an official federal designation. It should complement, not replace, official classifications for regulatory or funding purposes.',
+      'The composite Rurality Index is a research tool, not an official federal designation. It should complement, not replace, official classifications for regulatory or funding purposes.',
       'RUCA is only available for ZIPs that appear in the USDA ZCTA file. Some ZIP codes (PO boxes, unique ZIPs) are not included.',
       'Distance-to-metro scores use a fixed list of large, medium, and small metro areas. Commuting patterns in border regions may not be fully captured.',
       'Broadband data is not yet incorporated in the live scoring; the weight redistributes to density and distance when broadband data is unavailable.',
+      'County counts vary by source. USDA ERS RUCC 2023 covers 3,233 counties; the app\u2019s working total of 3,235 includes county-equivalent jurisdictions such as Louisiana parishes, Alaska boroughs and census areas, Virginia independent cities, and the District of Columbia. Census ACS vintages land near 3,143. Totals will not match every federal source exactly.',
     ];
 
     const Chapter = ({ num, kicker, title, children }) => (
@@ -1418,15 +1419,15 @@ const RuralityApp = () => {
         {/* ── §2 Background / motivation ────────────────────────────── */}
         <Chapter num="§2" kicker="The Motivation" title={<>Why <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>build</em> this.</>}>
           <p className="fg-display text-xl sm:text-2xl leading-snug italic max-w-3xl" style={{ color: 'var(--color-ink)' }}>
-            &ldquo;Rurality shapes election administration, civic engagement, public health access, and
-            economic opportunity &mdash; and yet most measures of it are categorical, outdated, or
-            designed for purposes far removed from the research at hand.&rdquo;
+            Rurality shapes election administration, civic engagement, public health access, and
+            economic opportunity, and yet most measures of it are categorical, outdated, or
+            designed for purposes far removed from the research at hand.
           </p>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
             The tool supports work at the{' '}
             <strong style={{ color: 'var(--color-ink)' }}>Institute for Rural Initiatives at Arkansas State University</strong>,
             where ongoing research examines how rurality interacts with the operations of American
-            democracy. The composite Rural Index draws on methods from the USDA Economic Research
+            democracy. The composite Rurality Index draws on methods from the USDA Economic Research
             Service, the U.S. Census Bureau, and the peer-reviewed literature on rural classification.
           </p>
         </Chapter>
@@ -1460,8 +1461,7 @@ const RuralityApp = () => {
         {/* ── §4 Limitations ────────────────────────────────────────── */}
         <Chapter num="§4" kicker="The Fine Print" title={<>Limitations &amp; <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>caveats</em>.</>}>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
-            Every measurement tool has edges &mdash; places where it can tell you less than you&rsquo;d
-            like. These are ours.
+            Every measurement tool has limitations, these are ours.
           </p>
           <ol className="space-y-4">
             {limitations.map((text, i) => (
@@ -1478,17 +1478,16 @@ const RuralityApp = () => {
           </ol>
         </Chapter>
 
-        {/* ── Colophon ──────────────────────────────────────────────── */}
+        {/* ── Source & feedback ─────────────────────────────────────── */}
         <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
           <div className="fg-rule mb-6">
-            <span>Colophon</span>
-            <span>Made with care &amp; R</span>
+            <span>Source &amp; Feedback:</span>
+            <span>Built in the open</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8">
               <p className="fg-display text-xl sm:text-2xl leading-snug italic max-w-2xl" style={{ color: 'var(--color-ink)' }}>
-                Set in Source Serif 4, DM Sans, and JetBrains Mono. Built with React, Tailwind, and
-                Leaflet. Deployed on Netlify. Source on GitHub.
+                Built with React, Tailwind, and Leaflet. Deployed on Netlify. Source on GitHub.
               </p>
             </div>
             <div className="lg:col-span-4 flex flex-col gap-3">
@@ -1649,7 +1648,7 @@ const RuralityApp = () => {
         <Chapter num="§1" kicker="The Weighting Scheme" title={<>How the pieces <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>combine</em>.</>}>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
             Not every location has every input. When a ZIP can be matched to USDA RUCA, we lean on it.
-            When it can&rsquo;t &mdash; say, for a county-level query &mdash; weight shifts to density and
+            When it can&rsquo;t (say, for a county-level query), weight shifts to density and
             distance. The confidence label summarizes how strong the weighting is for that scenario.
           </p>
 
@@ -1751,7 +1750,7 @@ const RuralityApp = () => {
             </ul>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-            Source: USDA ERS RUCC 2023 · 3,235 U.S. counties · updated on each decennial revision.
+            Source: USDA ERS RUCC 2023 · 3,233 U.S. counties · updated on each decennial revision.
           </p>
         </Chapter>
 
@@ -1833,7 +1832,7 @@ const RuralityApp = () => {
         {/* ── References ────────────────────────────────────────────── */}
         <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
           <div className="fg-rule mb-6">
-            <span>End-matter</span>
+            <span>End-matter:</span>
             <span>Key References</span>
           </div>
           <ol className="space-y-5 max-w-4xl">
@@ -1981,7 +1980,7 @@ your_zip_data <- your_zip_data |>
     rural_ruca = is_rural_ruca(ruca_code)
   )
 ` },
-      { n: '05', title: 'Compute composite Rural Index', code: `
+      { n: '05', title: 'Compute composite Rurality Index', code: `
 # Weights when RUCA is available but broadband data is not:
 #   RUCA 55%, Population density 25%, Distance to metro 20%
 # This simplified version uses RUCA + density (omits distance to metro).
@@ -2027,13 +2026,6 @@ your_data <- your_data |>
         page: 'https://geocoding.geo.census.gov/geocoder/',
         file: null, fileLabel: null },
     ];
-
-    const MetaKV = ({ k, v, sep = false }) => (
-      <div className={`flex items-baseline gap-3 ${sep ? 'border-t border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] pt-2 mt-2' : ''}`}>
-        <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono flex-shrink-0 w-24" style={{ color: 'var(--color-ink-muted)' }}>{k}</span>
-        <span className="text-sm text-slate-700 dark:text-slate-300">{v}</span>
-      </div>
-    );
 
     const Chapter = ({ num, kicker, title, children }) => (
       <section className="relative">
@@ -2111,8 +2103,7 @@ your_data <- your_data |>
                  style={{ fontFamily: 'var(--font-display)' }}>
                 Rurality.app is built on publicly available federal datasets and a transparent
                 composite methodology. Everything you need to cite the tool, replicate the
-                scores in R, and merge the underlying data into your own analysis &mdash; here,
-                one page down.
+                scores in R, and merge the underlying data into your own analysis.
               </p>
             </div>
 
@@ -2155,7 +2146,7 @@ your_data <- your_data |>
             </p>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-            If you use the composite Rural Index methodology in published work, please also cite
+            If you use the composite Rurality Index methodology in published work, please also cite
             the underlying USDA ERS data sources listed in &sect;5.
           </p>
         </Chapter>
@@ -2163,8 +2154,8 @@ your_data <- your_data |>
         {/* ── §2 Suggested uses ─────────────────────────────────────── */}
         <Chapter num="§2" kicker="Where it Fits" title={<>Suggested <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>uses</em>.</>}>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
-            A sampling of the research designs the index and its inputs tend to serve &mdash;
-            drawn from political science, public health, education, and grantwriting practice.
+            This is a sampling of the research designs the index and its inputs tend to serve.
+            They are drawn from political science, public health, education, and grantwriting practice.
           </p>
           <ol className="divide-y divide-dashed divide-[rgba(26,58,42,0.18)] dark:divide-[rgba(255,255,255,0.1)] border-y border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
             {uses.map(({ title, desc }, i) => (
@@ -2197,11 +2188,19 @@ your_data <- your_data |>
                 Primary artifact · № 01
               </div>
               <div className="fg-display text-2xl text-white">County Rurality Dataset</div>
-              <div className="mt-1 text-sm text-white/70">
-                <MetaKV k="Format" v="CSV" />
-                <MetaKV k="Rows" v="3,235 counties" />
-                <MetaKV k="Variables" v="24" />
-                <MetaKV k="Size" v="≈ 500 KB" />
+              <div className="mt-3 space-y-1.5">
+                {[
+                  ['Format',    'CSV'],
+                  ['Rows',      '3,235 counties'],
+                  ['Variables', '24'],
+                  ['Size',      '≈ 500 KB'],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-baseline gap-3">
+                    <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono flex-shrink-0 w-24"
+                          style={{ color: 'var(--color-wheat)' }}>{k}</span>
+                    <span className="text-sm text-white">{v}</span>
+                  </div>
+                ))}
               </div>
             </div>
             <a href={`${process.env.PUBLIC_URL}/data/county_rurality.csv`}
@@ -2317,7 +2316,7 @@ your_data <- your_data |>
         {/* ── §5 R replication walkthrough ──────────────────────────── */}
         <Chapter num="§5" kicker="Step-by-Step in R" title={<>Replicate the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>score</em>.</>}>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
-            The composite Rural Index can be replicated entirely in R using the same USDA and
+            The composite Rurality Index can be replicated entirely in R using the same USDA and
             Census data this app uses. The five exhibits below walk through each step.
           </p>
 
@@ -2391,7 +2390,7 @@ your_data <- your_data |>
         {/* ── End-matter: collaboration ─────────────────────────────── */}
         <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
           <div className="fg-rule mb-6">
-            <span>End-matter</span>
+            <span>End-matter:</span>
             <span>Collaboration &amp; Feedback</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2448,7 +2447,7 @@ your_data <- your_data |>
                 <h1 className="text-lg font-bold text-white tracking-tight leading-none" style={{ fontFamily: 'var(--font-display)' }}>
                   Rurality.app
                 </h1>
-                <div className="hidden sm:block text-[0.55rem] uppercase tracking-[0.28em] font-mono leading-tight" style={{ color: 'var(--color-wheat)' }}>
+                <div className="hidden sm:block mt-1 text-[0.55rem] uppercase tracking-[0.28em] font-mono leading-tight" style={{ color: 'var(--color-wheat)' }}>
                   A Field Guide &middot; Ed. 2026
                 </div>
               </div>
@@ -2556,7 +2555,7 @@ your_data <- your_data |>
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-wheat)' }} />
           <div>
             <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Advisory</span>
-            <strong>Research tool in development.</strong> The composite Rural Index score is a working draft and has not yet been peer reviewed or formally validated. It should not be cited as a finalized measure. The underlying USDA RUCA codes, RUCC codes, and Census data are official federal datasets and may be used independently. We welcome <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: 'var(--color-ink-muted)' }}>feedback</a>.
+            <strong>Research tool in development.</strong> The composite Rurality Index score is a working draft and has not yet been peer reviewed or formally validated. It should not be cited as a finalized measure. The underlying USDA RUCA codes, RUCC codes, and Census data are official federal datasets and may be used independently. We welcome <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: 'var(--color-ink-muted)' }}>feedback</a>.
           </div>
         </div>
       </div>
@@ -2567,7 +2566,7 @@ your_data <- your_data |>
           <div className="rounded-lg border border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] p-5 sm:p-6"
                style={{ backgroundColor: 'var(--color-cream)' }}>
             <div className="fg-rule mb-4">
-              <span>Field Inquiry</span>
+              <span>Field Inquiry:</span>
               <span>City &middot; County &middot; ZIP</span>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -2712,7 +2711,7 @@ your_data <- your_data |>
                   <ScoreDial
                     score={ruralityData.overallScore}
                     confidence={ruralityData.confidence}
-                    size={260}
+                    size={320}
                   />
                 </div>
               </div>
@@ -2768,7 +2767,7 @@ your_data <- your_data |>
                     { value: ruralityData.demographics.unemploymentRate
                         ? `${ruralityData.demographics.unemploymentRate}%`
                         : 'N/A', label: 'Unemployment' },
-                    { value: ruralityData.overallScore, label: 'Rural Index' },
+                    { value: ruralityData.overallScore, label: 'Rurality Index' },
                   ].map(({ value, label }, i, arr) => (
                     <div key={label}
                          className={`py-4 px-3 text-center ${i !== arr.length - 1 ? 'md:border-r border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]' : ''}`}>
@@ -2804,10 +2803,10 @@ your_data <- your_data |>
                     onClick={() => setSpecimenOpen(true)}
                     className="flex items-center space-x-2 px-4 py-2 rounded-md text-xs uppercase tracking-wider font-mono border transition-colors"
                     style={{ borderColor: 'var(--color-wheat)', color: 'var(--color-wheat)' }}
-                    title="Generate a shareable 1200×630 specimen card"
+                    title="Generate a shareable 1200×630 field card"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span>Specimen Card</span>
+                    <span>Field Card</span>
                   </button>
                   <button
                     onClick={shareResults}
@@ -2880,7 +2879,7 @@ your_data <- your_data |>
                   <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300"
                      style={{ fontFamily: 'var(--font-display)' }}>
                     A continuous rurality index for every county, ZIP, and
-                    address in the United States &mdash; assembled from USDA,
+                    address in the United States. Data are assembled from USDA,
                     Census, and federal broadband data.
                   </p>
                 </div>
@@ -2909,12 +2908,10 @@ your_data <- your_data |>
               <blockquote className="fg-rise fg-d4 mt-10 sm:mt-14 max-w-3xl mx-auto text-center px-2">
                 <div className="fg-display text-2xl sm:text-3xl leading-snug italic"
                      style={{ color: 'var(--color-ink)' }}>
-                  &ldquo;Rural is not a place on a map &mdash; it is a gradient
-                  of distance, density, and access that no single code can
-                  capture alone.&rdquo;
-                </div>
-                <div className="mt-4 text-[0.7rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
-                  &mdash; Working Methodology, §2
+                  Rural is not a place on a map. It is a gradient
+                  of distance, density, and access that no single metric can
+                  capture alone. Behind every score is a community with
+                  neighbors, schools, and polling places that people call home.
                 </div>
               </blockquote>
             </section>
@@ -2922,7 +2919,7 @@ your_data <- your_data |>
             {/* ── Example lookups ─────────────────────────────────────── */}
             <section>
               <div className="fg-rule fg-rise fg-d3 mb-6">
-                <span>Try an Example</span>
+                <span>Try an Example:</span>
                 <span>Tap a place to see its score</span>
               </div>
 
@@ -2978,7 +2975,7 @@ your_data <- your_data |>
             {/* ── Value props as catalogued entries ───────────────────── */}
             <section>
               <div className="fg-rule fg-rise fg-d3 mb-6">
-                <span>What's Inside</span>
+                <span>What's Inside:</span>
                 <span>Built for research & reuse</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 border-t border-b border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]">
@@ -3101,10 +3098,9 @@ your_data <- your_data |>
           </div>
 
           {/* Bottom rule + colophon */}
-          <div className="mt-8 pt-5 border-t border-dashed flex flex-col sm:flex-row items-center justify-between gap-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+          <div className="mt-8 pt-5 border-t border-dashed flex items-center justify-center gap-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono"
                style={{ borderColor: 'rgba(212,168,67,0.3)', color: 'rgba(255,255,255,0.5)' }}>
             <span>&copy; 2026 Rurality.app &middot; Not for regulatory use</span>
-            <span>Set in Source Serif 4 &middot; DM Sans &middot; JetBrains Mono</span>
           </div>
         </div>
       </footer>

@@ -174,7 +174,7 @@ export default function BatchLookup() {
               style={{ backgroundColor: 'var(--color-parchment)', borderColor: 'var(--color-rule)' }}>
         <div className="fg-rule mb-8">
           <span>§ Batch Inquiry</span>
-          <span className="hidden sm:inline">Up to 100 specimens per run</span>
+          <span className="hidden sm:inline">Up to 100 locations per run</span>
           <span>CSV · Paste · Export</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">

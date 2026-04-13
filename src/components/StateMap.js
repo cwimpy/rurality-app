@@ -186,12 +186,12 @@ export default function StateMap({ onLocationSearch }) {
         <div className="fg-rule mb-8">
           <span>§ North America</span>
           <span className="hidden sm:inline">County Plate &middot; RUCC 2023</span>
-          <span>3,235 specimens</span>
+          <span>3,235 counties</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
           <div className="lg:col-span-8">
             <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
-              Every U.S. county, <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>coloured</em> by RUCC.
+              Every U.S. county, <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>colored</em> by RUCC.
             </h2>
             <p className="mt-5 max-w-2xl text-base sm:text-lg leading-relaxed"
                style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}>
@@ -250,7 +250,7 @@ export default function StateMap({ onLocationSearch }) {
       {/* ── The Map Plate ─────────────────────────────────────────── */}
       <section>
         <div className="fg-rule mb-4">
-          <span>The Plate</span>
+          <span>The Plate:</span>
           <span>Click a county to open</span>
         </div>
 
@@ -320,7 +320,7 @@ export default function StateMap({ onLocationSearch }) {
                 }}
               >
                 <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-1" style={{ color: 'var(--color-ink-muted)' }}>
-                  Specimen
+                  Location
                 </div>
                 <div className="fg-display text-base leading-tight" style={{ color: 'var(--color-ink)' }}>
                   {hovered.countyName}
@@ -348,7 +348,7 @@ export default function StateMap({ onLocationSearch }) {
       {/* ── Legend ────────────────────────────────────────────────── */}
       <section>
         <div className="fg-rule mb-4">
-          <span>Legend</span>
+          <span>Legend:</span>
           <span>RUCC 2023 &middot; Nine codes &middot; Four tiers</span>
         </div>
 

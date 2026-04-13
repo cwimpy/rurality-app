@@ -63,18 +63,31 @@ const ScoreDial = ({ score = 0, size = 280, showLabel = true, confidence = '' })
 
   const cx = 150;
   const cy = 150;
+  // Layout — from outside in, concentric zones:
+  //   138 ─┬─ outer decorative ring
+  //   130 ─┤   dashed inner ring
+  //   117 ─┤   arc outer edge  ─┐
+  //   110 ─┤   arc center       │  strokeWidth 14
+  //   103 ─┤   arc inner edge  ─┘
+  //    95 ─┤   tick marks (extend inward from outside arc to here for major)
+  //    90 ─┤   numeral labels (0, 20, 40, 60, 80, 100)
+  //    82 ─┤   tier labels (URBAN, SUBURBAN, ...)
+  //    72 ─┤   needle tip
+  //    64 ─┤   needle base
+  //    62 ─┤   center plate edge
+  //     0 ─┴─ center (score numeral + "RURALITY/100" label inside plate)
   const rOuter   = 138;
   const rRing    = 130;
   const rTrack   = 110;
   const rTickOut = 118;
   const rTickInS = 111;
-  const rTickInL = 102;
-  const rTierLbl = 87;
-  const rNumeralTick = 95;
+  const rTickInL = 100;
+  const rNumeralTick = 90;
+  const rTierLbl     = 82;
 
-  // Needle geometry — floats in the ring between center plate and track
-  const needleInner = 68;
-  const needleOuter = 100;
+  // Needle geometry — sits between center plate and tier labels
+  const needleInner = 64;
+  const needleOuter = 73;
   const needleAngle = scoreToAngle(display);
   const baseHalfDeg = 3;
   const [nx,  ny ] = polar(cx, cy, needleOuter, needleAngle);
@@ -193,25 +206,41 @@ const ScoreDial = ({ score = 0, size = 280, showLabel = true, confidence = '' })
           </text>
         ))}
 
-        {/* Tier labels on inner ring */}
+        {/* Tier labels on inner ring — long labels stack onto two lines so they don't crash the center plate */}
         {tierLabels.map(({ label, x, y, from, to }, i) => {
           const isActive = target >= from && (target < to || (to === 100 && target === 100));
+          const style = {
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 7.5,
+            letterSpacing: '0.22em',
+            fontWeight: isActive ? 700 : 400,
+            fill: isActive ? fillColor : 'var(--color-sage)',
+            opacity: isActive ? 1 : 0.55,
+            transition: 'fill 0.4s, opacity 0.4s',
+          };
+          const words = label.includes(' ') ? label.split(' ') : null;
+          if (words) {
+            // Stack each word on its own line, centered vertically on (x, y)
+            const lineHeight = 8;
+            const offsetY = -((words.length - 1) * lineHeight) / 2;
+            return (
+              <g key={i}>
+                {words.map((w, j) => (
+                  <text key={j}
+                        x={x} y={y + offsetY + j * lineHeight}
+                        textAnchor="middle" dominantBaseline="middle"
+                        style={style}>
+                    {w}
+                  </text>
+                ))}
+              </g>
+            );
+          }
           return (
-            <text
-              key={i}
-              x={x} y={y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 7.5,
-                letterSpacing: '0.22em',
-                fontWeight: isActive ? 700 : 400,
-                fill: isActive ? fillColor : 'var(--color-sage)',
-                opacity: isActive ? 1 : 0.55,
-                transition: 'fill 0.4s, opacity 0.4s',
-              }}
-            >
+            <text key={i}
+                  x={x} y={y}
+                  textAnchor="middle" dominantBaseline="middle"
+                  style={style}>
               {label}
             </text>
           );
