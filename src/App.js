@@ -439,7 +439,7 @@ const RuralityApp = () => {
       ['', '', ''],
       ...Object.entries(ruralityData.metrics).map(([, m]) => [m.label, m.value, m.score]),
       ['', '', ''],
-      ['Population', ruralityData.demographics?.population ?? 'N/A', ''],
+      ['County Population', ruralityData.demographics?.population ?? 'N/A', ''],
       ['Median Age', ruralityData.demographics?.medianAge ?? 'N/A', ''],
       ['Median Income', ruralityData.demographics?.medianIncome
         ? `$${ruralityData.demographics.medianIncome.toLocaleString()}` : 'N/A', ''],
@@ -480,7 +480,7 @@ const RuralityApp = () => {
     }).join('');
 
     const demoRows = [
-      ['Population',         demo?.population?.toLocaleString() ?? 'N/A'],
+      ['County Population',  demo?.population?.toLocaleString() ?? 'N/A'],
       ['Median Income',      demo?.medianIncome ? '$' + demo.medianIncome.toLocaleString() : 'N/A'],
       ['Median Age',         demo?.medianAge ?? 'N/A'],
       ['Unemployment Rate',  demo?.unemploymentRate ? demo.unemploymentRate + '%' : 'N/A'],
@@ -832,6 +832,10 @@ const RuralityApp = () => {
               </div>
             )}
           </>
+        ) : badge && badge !== 'N/A' ? (
+          // Label-only classification (e.g. OMB Metropolitan / Micropolitan / Nonmetro) —
+          // no numeric code, so show the badge's description prominently.
+          <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug">{description}</p>
         ) : (
           <p className="text-sm italic" style={{ color: 'var(--color-ink-muted)' }}>Not available for this location</p>
         )}
@@ -2697,7 +2701,7 @@ your_data <- your_data |>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                     {ruralityData.demographics?.population > 0 && (
                       <div className="text-slate-600 dark:text-slate-400">
-                        <span className="text-[0.65rem] uppercase tracking-wider font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Pop.</span>
+                        <span className="text-[0.65rem] uppercase tracking-wider font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>County Pop.</span>
                         <span style={{ color: 'var(--color-ink)' }}>{ruralityData.demographics.population.toLocaleString()}</span>
                       </div>
                     )}

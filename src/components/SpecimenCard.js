@@ -221,7 +221,7 @@ const SpecimenCardSVG = React.forwardRef(({ location, score, confidence, classif
             </tspan>
           </text>
           {population > 0 && (
-            <text x="72" y="388">POPULATION &nbsp;·&nbsp;
+            <text x="72" y="388">COUNTY POP. &nbsp;·&nbsp;
               <tspan fontFamily="Source Serif 4, Georgia, serif" fontVariantNumeric="oldstyle-nums" fontSize="15" fill="#1a3a2a" letterSpacing="0">
                 {' '}{population.toLocaleString()}
               </tspan>
