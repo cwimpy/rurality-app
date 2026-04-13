@@ -9,11 +9,13 @@ const TIER = (s) => {
   return        { label: 'Urban',      color: '#991b1b' };
 };
 
+// Confidence has three buckets in code: high / medium-high / medium.
+// Test 'medium-high' before 'high' since both contain "high".
 const confidenceBars = (conf) => {
   if (!conf) return 0;
-  if (/high/i.test(conf)) return 3;
-  if (/medium/i.test(conf)) return 2;
-  if (/low/i.test(conf)) return 1;
+  if (/medium-high/i.test(conf)) return 2;
+  if (/high/i.test(conf))        return 3;
+  if (/medium/i.test(conf))      return 1;
   return 0;
 };
 

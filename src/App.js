@@ -2893,7 +2893,7 @@ your_data <- your_data |>
                     {[
                       { n: '3,235',  l: 'U.S. counties covered' },
                       { n: '41,146', l: 'ZIP Code Tabulation Areas' },
-                      { n: '6',      l: 'Rurality indicators, one score' },
+                      { n: '4',      l: 'Weighted components, one score' },
                     ].map((s, i) => (
                       <div key={s.n} className={`flex items-baseline gap-3 ${i !== 2 ? 'mb-3 pb-3 border-b border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]' : ''}`}>
                         <div className="fg-numeral text-3xl sm:text-4xl" style={{ color: 'var(--color-ink)' }}>{s.n}</div>

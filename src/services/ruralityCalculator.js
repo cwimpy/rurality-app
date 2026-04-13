@@ -1,15 +1,23 @@
 /**
- * Rurality Calculator — Research-Based Hybrid Methodology
+ * Rurality Calculator — Research-Based Hybrid Methodology (DRAFT)
  *
- * Weights (when RUCA is available):
+ * Weights when full data available (confidence: high):
  *   RUCA code          50%  — USDA gold standard commuting-area classification
  *   Population density 25%  — Census ACS
  *   Distance to metro  15%  — Haversine to nearest metro tier
  *   Broadband access   10%  — FCC / NTIA (when available)
  *
- * When RUCA is unavailable (ZIP not in dataset), weights redistribute:
- *   Population density 55%, Distance 30%, Broadband 15%
- *   Confidence drops to 'medium'.
+ * RUCA only (confidence: medium-high):
+ *   RUCA 55%, Density 25%, Distance 20%
+ *
+ * No RUCA, broadband available (confidence: medium):
+ *   Density 50%, Distance 25%, Broadband 25%
+ *
+ * Density + Distance only (confidence: medium):
+ *   Density 55%, Distance 45%
+ *
+ * These values match the Methodology page §1 exhibit and the R replication
+ * snippet in Researchers §5. Any change here must also update those surfaces.
  */
 
 import { rucaToScore, getRUCADescription, isRuralByRUCA } from '../data/rucaZcta';
@@ -57,20 +65,26 @@ export function calculateRuralityScore({
   // ── 5. Weighted total ────────────────────────────────────────────────────
   let weights, totalScore;
 
+  // Weights per published methodology (see Methodology page §1 and CLAUDE.md).
+  // Draft index — subject to refinement before peer review.
   if (rucaScore !== null && broadbandScore !== null) {
-    weights = { ruca: 0.35, density: 0.30, distance: 0.20, broadband: 0.15 };
+    // Full data: RUCA + Density + Distance + Broadband
+    weights = { ruca: 0.50, density: 0.25, distance: 0.15, broadband: 0.10 };
     totalScore = rucaScore * weights.ruca + densityScore * weights.density +
                  distanceScore * weights.distance + broadbandScore * weights.broadband;
   } else if (rucaScore !== null) {
-    weights = { ruca: 0.40, density: 0.35, distance: 0.25, broadband: 0.00 };
+    // RUCA available but no broadband: weight shifts to distance
+    weights = { ruca: 0.55, density: 0.25, distance: 0.20, broadband: 0.00 };
     totalScore = rucaScore * weights.ruca + densityScore * weights.density +
                  distanceScore * weights.distance;
   } else if (broadbandScore !== null) {
+    // No RUCA but broadband present
     weights = { ruca: 0.00, density: 0.50, distance: 0.25, broadband: 0.25 };
     totalScore = densityScore * weights.density + distanceScore * weights.distance +
                  broadbandScore * weights.broadband;
   } else {
-    weights = { ruca: 0.00, density: 0.55, distance: 0.30, broadband: 0.00 };
+    // Fallback: density + distance only
+    weights = { ruca: 0.00, density: 0.55, distance: 0.45, broadband: 0.00 };
     totalScore = densityScore * weights.density + distanceScore * weights.distance;
   }
 

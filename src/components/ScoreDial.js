@@ -121,7 +121,13 @@ const ScoreDial = ({ score = 0, size = 280, showLabel = true, confidence = '' })
   const currentTier = tierLabel(target);
 
   // Confidence dashes (1-3)
-  const confLevel = /high/i.test(confidence) ? 3 : /medium/i.test(confidence) ? 2 : /low/i.test(confidence) ? 1 : 0;
+  // Confidence has three buckets in code: high / medium-high / medium.
+  // Test 'medium-high' before 'high' since both contain "high".
+  const confLevel =
+    /medium-high/i.test(confidence) ? 2 :
+    /high/i.test(confidence)        ? 3 :
+    /medium/i.test(confidence)      ? 1 :
+                                      0;
 
   return (
     <div className="inline-flex flex-col items-center" style={{ width: size }}>

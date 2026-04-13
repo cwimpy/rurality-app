@@ -27,11 +27,13 @@ export function getRUCAForZcta(zcta) {
   return _data[String(zcta).trim().substring(0, 5)] ?? null;
 }
 
+// Map per Methodology page exhibit and R replication snippet (Researchers §5).
+// Draft index — values may change before peer review.
 const RUCA_SCORE_MAP = {
-  1: 5, 2: 15, 3: 25,
-  4: 38, 5: 48, 6: 58,
-  7: 68, 8: 78, 9: 86,
-  10: 95
+  1: 8,  2: 15, 3: 24,
+  4: 38, 5: 48, 6: 56,
+  7: 68, 8: 76, 9: 84,
+  10: 95,
 };
 
 export function rucaToScore(ruca) {
