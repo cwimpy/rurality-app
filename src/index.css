@@ -5,19 +5,35 @@
 :root {
   --font-display: 'Source Serif 4', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
+  /* Brand colors — stay stable across modes so forest/wheat bg chrome keeps its identity */
   --color-forest: #1a3a2a;
   --color-sage: #4a7c59;
   --color-wheat: #d4a843;
+  /* Surfaces — dark in .dark */
   --color-cream: #faf8f4;
   --color-parchment: #f3f0e8;
+  /* Text aliases — adapt by mode. Use these for any readable text. */
+  --color-ink: #1a3a2a;         /* primary text (was "forest" as text) */
+  --color-ink-muted: #4a7c59;   /* secondary text (was "sage" as text) */
+  --color-ink-subtle: rgba(26,58,42,0.55);
+  --color-rule: rgba(26,58,42,0.18);
+  --color-rule-soft: rgba(26,58,42,0.10);
 }
 
 .dark {
-  --color-forest: #0f2318;
-  --color-sage: #3a6349;
-  --color-wheat: #c49933;
-  --color-cream: #1a1a1a;
-  --color-parchment: #242424;
+  /* Keep brand colors the same so forest/wheat backgrounds still look forest/wheat */
+  --color-forest: #1a3a2a;
+  --color-sage: #6f9781;
+  --color-wheat: #e0b94a;
+  /* Surfaces go dark */
+  --color-cream: #141814;
+  --color-parchment: #1d2520;
+  /* Text aliases flip — light on dark surfaces */
+  --color-ink: #e6e2d4;
+  --color-ink-muted: #9db9a4;
+  --color-ink-subtle: rgba(230,226,212,0.5);
+  --color-rule: rgba(230,226,212,0.18);
+  --color-rule-soft: rgba(230,226,212,0.08);
 }
 
 body {
@@ -26,12 +42,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-cream);
-  color: #1e293b;
+  color: var(--color-ink);
 }
 
 .dark body,
 .dark {
-  color: #e2e8f0;
+  color: var(--color-ink);
 }
 
 h1, h2, h3, h4 {
@@ -59,4 +75,109 @@ code {
   opacity: 0.03;
   z-index: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* ── Field-guide hero utilities ────────────────────────────────────── */
+
+/* Topographic contour-line decoration, inline SVG, subtle */
+.topo-bg {
+  background-image:
+    radial-gradient(ellipse 120% 80% at 80% 0%, rgba(74,124,89,0.08), transparent 60%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400' fill='none' stroke='%231a3a2a' stroke-opacity='0.08' stroke-width='1'><path d='M0 320 Q 150 280 300 300 T 600 290'/><path d='M0 280 Q 150 240 300 260 T 600 250'/><path d='M0 240 Q 150 200 300 220 T 600 210'/><path d='M0 200 Q 150 160 300 180 T 600 170'/><path d='M0 160 Q 150 120 300 140 T 600 130'/><path d='M0 120 Q 150 80 300 100 T 600 90'/><path d='M0 80 Q 150 40 300 60 T 600 50'/></svg>");
+  background-size: auto, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.dark .topo-bg {
+  background-image:
+    radial-gradient(ellipse 120% 80% at 80% 0%, rgba(74,124,89,0.12), transparent 60%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400' fill='none' stroke='%234a7c59' stroke-opacity='0.15' stroke-width='1'><path d='M0 320 Q 150 280 300 300 T 600 290'/><path d='M0 280 Q 150 240 300 260 T 600 250'/><path d='M0 240 Q 150 200 300 220 T 600 210'/><path d='M0 200 Q 150 160 300 180 T 600 170'/><path d='M0 160 Q 150 120 300 140 T 600 130'/><path d='M0 120 Q 150 80 300 100 T 600 90'/><path d='M0 80 Q 150 40 300 60 T 600 50'/></svg>");
+}
+
+/* Staggered reveal */
+@keyframes fg-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fg-rise { animation: fg-rise 0.7s cubic-bezier(.2,.7,.2,1) both; }
+.fg-d1 { animation-delay: 0.05s; }
+.fg-d2 { animation-delay: 0.18s; }
+.fg-d3 { animation-delay: 0.32s; }
+.fg-d4 { animation-delay: 0.46s; }
+.fg-d5 { animation-delay: 0.60s; }
+
+/* Ticker marquee for sources */
+@keyframes fg-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.fg-ticker-track {
+  animation: fg-marquee 38s linear infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fg-rise, .fg-ticker-track { animation: none; }
+  .fg-rise { opacity: 1; transform: none; }
+}
+
+/* Rule with centered mark (§) */
+.fg-rule {
+  display: flex; align-items: center; gap: 0.75rem;
+  color: var(--color-sage);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.fg-rule::before, .fg-rule::after {
+  content: ''; flex: 1; height: 1px;
+  background: currentColor; opacity: 0.35;
+}
+
+/* Plate card — field notebook paper */
+.fg-plate {
+  position: relative;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 26px, rgba(26,58,42,0.05) 26px 27px),
+    var(--color-cream);
+  border: 1px solid rgba(26,58,42,0.14);
+  box-shadow:
+    0 1px 0 rgba(26,58,42,0.04),
+    0 10px 30px -20px rgba(26,58,42,0.35);
+  transition: transform 0.4s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s;
+}
+.dark .fg-plate {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 26px, rgba(255,255,255,0.04) 26px 27px),
+    var(--color-parchment);
+  border-color: rgba(255,255,255,0.08);
+}
+.fg-plate:hover {
+  transform: translateY(-3px) rotate(-0.3deg);
+  box-shadow:
+    0 1px 0 rgba(26,58,42,0.06),
+    0 24px 50px -28px rgba(26,58,42,0.55);
+}
+.fg-plate::before {
+  content: ''; position: absolute; inset: 0;
+  pointer-events: none;
+  border: 1px dashed rgba(26,58,42,0.18);
+  margin: 6px;
+}
+.dark .fg-plate::before { border-color: rgba(255,255,255,0.10); }
+
+/* Oversized italic display tweak */
+.fg-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+/* Drop-cap style score numeral */
+.fg-numeral {
+  font-family: var(--font-display);
+  font-variant-numeric: oldstyle-nums;
+  font-weight: 400;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
 }

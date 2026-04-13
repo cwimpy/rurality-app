@@ -1,7 +1,7 @@
 {
   "short_name": "Rurality",
-  "name": "Rurality.app — US Rural Classification Tool",
-  "description": "Look up the rurality of any US city, county, or ZIP code using USDA RUCA and RUCC codes, Census data, and a composite Rural Index score.",
+  "name": "Rurality.app — A Field Guide to Rural America",
+  "description": "Look up the rurality of any U.S. city, county, or ZIP code. Official USDA RUCA and RUCC codes, Census demographics, and a composite Rural Index score — all drawn from real federal data.",
   "icons": [
     {
       "src": "favicon.svg",
@@ -28,8 +28,8 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#16a34a",
-  "background_color": "#f0fdf4",
+  "theme_color": "#1a3a2a",
+  "background_color": "#faf8f4",
   "categories": ["education", "productivity", "research"],
   "orientation": "any"
 }

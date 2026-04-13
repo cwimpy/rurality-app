@@ -8,34 +8,38 @@
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#16a34a" />
+    <!-- Forest green matches the header chrome in both light and dark modes -->
+    <meta name="theme-color" content="#1a3a2a" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f2318" media="(prefers-color-scheme: dark)" />
 
     <!-- Primary meta -->
-    <title>Rurality.app — Rural Classification Tool</title>
+    <title>Rurality.app — A Field Guide to Rural America</title>
     <meta name="description"
-          content="Look up the rurality of any US city, county, or ZIP code using USDA RUCA and RUCC codes, Census population data, and a research-based composite Rural Index score." />
+          content="A research tool for measuring the rurality of any U.S. city, county, or ZIP code. Built on USDA RUCA and RUCC codes, Census demographics, and a transparent composite Rural Index." />
     <meta name="keywords"
           content="rurality, rural index, RUCA, RUCC, rural urban continuum, population density, census data, rural classification, US counties, rural research" />
     <meta name="author" content="Cameron Wimpy, Arkansas State University" />
 
     <!-- Open Graph -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:url"         content="https://rurality.app/" />
-    <meta property="og:title"       content="Rurality.app — Rural Classification Tool" />
-    <meta property="og:description" content="Look up the rurality of any US city, county, or ZIP code. Official USDA RUCA and RUCC codes, Census demographics, and a composite Rural Index score — all from real government data." />
-    <meta property="og:image"       content="https://rurality.app/og-card.png" />
+    <meta property="og:type"         content="website" />
+    <meta property="og:url"          content="https://rurality.app/" />
+    <meta property="og:title"        content="Rurality.app — A Field Guide to Rural America" />
+    <meta property="og:description"  content="A research tool for measuring the rurality of any U.S. location. Composite Rural Index, official USDA RUCA & RUCC codes, and Census demographics — all from real federal data." />
+    <meta property="og:image"        content="https://rurality.app/og-card.png" />
     <meta property="og:image:width"  content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt"   content="Rurality.app — Rural Classification Tool" />
-    <meta property="og:site_name"   content="Rurality.app" />
+    <meta property="og:image:alt"    content="Rurality.app — A Field Guide to Rural America" />
+    <meta property="og:site_name"    content="Rurality.app" />
+    <meta property="og:locale"       content="en_US" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card"        content="summary_large_image" />
     <meta name="twitter:url"         content="https://rurality.app/" />
-    <meta name="twitter:title"       content="Rurality.app — Rural Classification Tool" />
-    <meta name="twitter:description" content="Look up the rurality of any US city, county, or ZIP code using USDA RUCA/RUCC codes and Census data." />
+    <meta name="twitter:title"       content="Rurality.app — A Field Guide to Rural America" />
+    <meta name="twitter:description" content="A research tool for measuring the rurality of any U.S. location — composite Rural Index, official USDA codes, and Census data." />
     <meta name="twitter:image"       content="https://rurality.app/og-card.png" />
-    <meta name="twitter:image:alt"   content="Rurality.app — Rural Classification Tool" />
+    <meta name="twitter:image:alt"   content="Rurality.app — A Field Guide to Rural America" />
+    <meta name="twitter:creator"     content="@cwimpy" />
 
     <!-- Canonical -->
     <link rel="canonical" href="https://rurality.app/" />
@@ -52,10 +56,10 @@
       gtag('config', 'G-G8L83N3HS2');
     </script>
 
-    <!-- Fonts -->
+    <!-- Fonts — Source Serif 4 (display + body serif), DM Sans (ui), JetBrains Mono (labels) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

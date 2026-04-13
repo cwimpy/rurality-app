@@ -1,40 +1,48 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Upload, Download, AlertCircle, CheckCircle, Loader, X } from 'lucide-react';
 import { geocodeWithCache, fetchCensusData, getCountyFromCoordinates } from '../utils/apiUtils';
 import { calculateRuralityScore } from '../services/ruralityCalculator';
 import { getRUCAForZcta } from '../data/rucaZcta';
 import { getRUCC } from '../data/ruralUrbanCodes';
 
+const tierColor = (score) =>
+  score == null ? 'var(--color-ink-muted)' :
+  score >= 80 ? '#1a5c2e' :
+  score >= 60 ? '#4a7c59' :
+  score >= 40 ? '#a17321' :
+  score >= 20 ? '#b45309' :
+                '#991b1b';
+
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
-  const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
-  const locCol = header.findIndex(h =>
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/"/g, ''));
+  const locCol = header.findIndex((h) =>
     ['location', 'address', 'place', 'city', 'zip', 'zipcode', 'zip_code', 'name'].includes(h)
   );
   if (locCol === -1) return null;
   return lines.slice(1)
-    .map(line => line.split(',').map(c => c.trim().replace(/"/g, '')))
-    .filter(cols => cols[locCol]?.trim())
-    .map(cols => cols[locCol].trim());
+    .map((line) => line.split(',').map((c) => c.trim().replace(/"/g, '')))
+    .filter((cols) => cols[locCol]?.trim())
+    .map((cols) => cols[locCol].trim());
 }
 
 function exportResultsCSV(results) {
   const headers = ['location', 'score', 'classification', 'confidence', 'county', 'state_fips', 'county_fips', 'rucc', 'population_density', 'distance_to_metro_mi', 'status'];
-  const rows = results.map(r => {
+  const rows = results.map((r) => {
     if (r.error) return [r.location, '', '', '', '', '', '', '', '', '', r.error];
     const d = r.data;
     return [
       r.location, d.overallScore, d.classification?.label || '', d.confidence || '',
       d.countyName || '', d.stateFips || '', d.countyFips || '',
-      d.rucc ?? '', d.density ?? '', d.distanceMi ?? '', 'OK'
+      d.rucc ?? '', d.density ?? '', d.distanceMi ?? '', 'OK',
     ];
   });
-  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+  const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${v}"`).join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -80,7 +88,7 @@ export default function BatchLookup() {
   }
 
   function handleTextSubmit() {
-    const locs = textInput.split('\n').map(l => l.trim()).filter(Boolean);
+    const locs = textInput.split('\n').map((l) => l.trim()).filter(Boolean);
     if (locs.length === 0) return;
     if (locs.length > 100) {
       setError('Maximum 100 locations per batch.');
@@ -115,7 +123,7 @@ export default function BatchLookup() {
           longitude: geo.lng,
           populationDensity: census.totalPopulation / county.areaSqMiles,
           rucaCode: ruca,
-          broadbandAccess: null
+          broadbandAccess: null,
         });
 
         out.push({
@@ -129,15 +137,14 @@ export default function BatchLookup() {
             countyFips: county.countyFips,
             rucc,
             density: Math.round(census.totalPopulation / county.areaSqMiles),
-            distanceMi: Math.round(calc.components.distance.nearestSmallMetro)
-          }
+            distanceMi: Math.round(calc.components.distance.nearestSmallMetro),
+          },
         });
       } catch (err) {
         out.push({ location: loc, error: err.message || 'Failed' });
       }
       setResults([...out]);
       setProgress(((i + 1) / locations.length) * 100);
-      // Rate limit: wait 1.1s between requests (Nominatim policy)
       if (i < locations.length - 1) await sleep(1100);
     }
 
@@ -157,68 +164,169 @@ export default function BatchLookup() {
     if (fileRef.current) fileRef.current.value = '';
   }
 
-  const successCount = results.filter(r => !r.error).length;
-  const errorCount = results.filter(r => r.error).length;
+  const successCount = results.filter((r) => !r.error).length;
+  const errorCount = results.filter((r) => r.error).length;
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2" style={{ fontFamily: 'var(--font-display)' }}>
-          Batch Lookup
-        </h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-6">
-          Upload a CSV or paste a list of locations to calculate rurality scores in bulk. Maximum 100 locations per batch.
-        </p>
+    <div className="space-y-10 sm:space-y-12 pb-8">
+      {/* ── Editorial masthead ─────────────────────────────────────── */}
+      <header className="topo-bg rounded-2xl border px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-12"
+              style={{ backgroundColor: 'var(--color-parchment)', borderColor: 'var(--color-rule)' }}>
+        <div className="fg-rule mb-8">
+          <span>§ Batch Inquiry</span>
+          <span className="hidden sm:inline">Up to 100 specimens per run</span>
+          <span>CSV · Paste · Export</span>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
+          <div className="lg:col-span-8">
+            <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
+              Run <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>many</em> at once.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base sm:text-lg leading-relaxed"
+               style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}>
+              Upload a CSV or paste a list of locations and the tool will geocode each,
+              pull Census + USDA data, and compute a rurality score for every row.
+              Rate-limited to one lookup per second per Nominatim policy.
+            </p>
+          </div>
+          <aside className="lg:col-span-4">
+            <div className="pl-5 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-3 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                The Ledger
+              </div>
+              {[
+                ['100', 'locations per batch'],
+                ['1.1s', 'rate-limited per lookup'],
+                ['11', 'columns in the export'],
+              ].map(([n, l], i, arr) => (
+                <div key={l} className={`flex items-baseline gap-3 ${i !== arr.length - 1 ? 'mb-2 pb-2 border-b border-dashed' : ''}`}
+                     style={i !== arr.length - 1 ? { borderColor: 'var(--color-rule)' } : {}}>
+                  <div className="fg-numeral text-2xl" style={{ color: 'var(--color-ink)' }}>{n}</div>
+                  <div className="text-xs uppercase tracking-wider" style={{ color: 'var(--color-ink-muted)' }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </header>
 
-        {locations.length === 0 ? (
-          <div className="space-y-4">
+      {/* ── Input stage ───────────────────────────────────────────── */}
+      {locations.length === 0 && (
+        <section>
+          <div className="fg-rule mb-5">
+            <span>§ 1 · Load</span>
+            <span>CSV or paste · max 100</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* File upload */}
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+              className="rounded-lg p-8 text-center cursor-pointer transition-colors group"
+              style={{
+                backgroundColor: 'var(--color-cream)',
+                border: '2px dashed var(--color-ink-muted)',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-wheat)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-ink-muted)'}
             >
-              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-              <p className="text-slate-600 dark:text-slate-400 font-medium">Drop a CSV file or click to upload</p>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Must have a column named "location", "address", "city", or "zip"</p>
+              <Upload className="w-7 h-7 mx-auto mb-4" style={{ color: 'var(--color-ink-muted)' }} />
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+                Upload CSV
+              </div>
+              <p className="fg-display text-lg" style={{ color: 'var(--color-ink)' }}>
+                Drop a file or click to browse.
+              </p>
+              <p className="mt-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)', opacity: 0.8 }}>
+                Column must be named: location · address · place · city · zip
+              </p>
               <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleFile} />
             </div>
 
-            {/* Or paste text */}
-            <div className="text-center text-sm text-slate-400">or paste locations below (one per line)</div>
-            <textarea
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              rows={5}
-              placeholder={"Jonesboro, AR\nJasper, AR\n72401\nTravis County, TX"}
-              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <button
-              onClick={handleTextSubmit}
-              disabled={!textInput.trim()}
-              className="px-6 py-2.5 text-white rounded-xl transition-colors disabled:opacity-50"
-              style={{ backgroundColor: 'var(--color-forest)' }}
-            >
-              Load Locations
-            </button>
+            {/* Paste */}
+            <div className="rounded-lg p-5"
+                 style={{ backgroundColor: 'var(--color-cream)', border: '1px solid var(--color-rule)' }}>
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+                Or Paste Locations
+              </div>
+              <p className="fg-display text-lg mb-3" style={{ color: 'var(--color-ink)' }}>
+                One per <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>line</em>.
+              </p>
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                rows={5}
+                placeholder={'Jonesboro, AR\nJasper, AR\n72401\nTravis County, TX'}
+                className="w-full p-3 text-sm resize-none outline-none transition-colors"
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--color-rule)',
+                  color: 'var(--color-ink)',
+                  borderRadius: '4px',
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--color-wheat)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--color-rule)'}
+              />
+              <button
+                onClick={handleTextSubmit}
+                disabled={!textInput.trim()}
+                className="mt-3 flex items-center gap-2 px-5 py-2 rounded-md text-[0.7rem] uppercase tracking-wider font-mono transition-colors disabled:opacity-40"
+                style={{ backgroundColor: 'var(--color-forest)', color: 'var(--color-wheat)' }}
+              >
+                <span>Load Locations</span>
+                <span aria-hidden>&rarr;</span>
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                {locations.length} location{locations.length !== 1 ? 's' : ''} loaded
-              </span>
+        </section>
+      )}
+
+      {/* ── Processing / Results stage ────────────────────────────── */}
+      {locations.length > 0 && (
+        <section>
+          <div className="fg-rule mb-5">
+            <span>§ 2 · {processing ? 'Processing' : results.length > 0 ? 'Results' : 'Ready'}</span>
+            <span>{locations.length} location{locations.length !== 1 ? 's' : ''} loaded</span>
+          </div>
+
+          <div className="rounded-lg overflow-hidden border"
+               style={{ backgroundColor: 'var(--color-cream)', borderColor: 'var(--color-rule)' }}>
+            {/* Controls bar */}
+            <div className="flex items-center justify-between px-5 py-4 border-b"
+                 style={{ borderColor: 'var(--color-rule)' }}>
+              <div className="flex items-center gap-4">
+                <span className="fg-numeral text-3xl" style={{ color: 'var(--color-ink)' }}>
+                  {locations.length}
+                </span>
+                <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  {processing
+                    ? 'Analyzing…'
+                    : results.length > 0
+                      ? `${successCount} OK · ${errorCount} failed`
+                      : 'Ready to process'}
+                </span>
+              </div>
               <div className="flex gap-2">
                 {!processing && results.length === 0 && (
-                  <button onClick={processLocations} className="px-5 py-2 text-white rounded-xl text-sm" style={{ backgroundColor: 'var(--color-forest)' }}>
-                    Start Processing
+                  <button onClick={processLocations}
+                          className="flex items-center gap-2 px-5 py-2 rounded-md text-[0.7rem] uppercase tracking-wider font-mono"
+                          style={{ backgroundColor: 'var(--color-forest)', color: 'var(--color-wheat)' }}>
+                    <span>Start</span>
+                    <span aria-hidden>&rarr;</span>
                   </button>
                 )}
                 {processing && (
-                  <button onClick={handleCancel} className="px-5 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700">
-                    Cancel
+                  <button onClick={handleCancel}
+                          className="flex items-center gap-2 px-4 py-2 rounded-md text-[0.7rem] uppercase tracking-wider font-mono border"
+                          style={{ borderColor: '#991b1b', color: '#991b1b' }}>
+                    <X className="w-3 h-3" />
+                    <span>Cancel</span>
                   </button>
                 )}
-                <button onClick={handleClear} className="px-5 py-2 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm hover:bg-slate-300 dark:hover:bg-slate-500">
+                <button onClick={handleClear}
+                        className="flex items-center gap-2 px-4 py-2 rounded-md text-[0.7rem] uppercase tracking-wider font-mono border"
+                        style={{ borderColor: 'var(--color-ink-muted)', color: 'var(--color-ink-muted)' }}>
                   Clear
                 </button>
               </div>
@@ -226,16 +334,25 @@ export default function BatchLookup() {
 
             {/* Progress bar */}
             {(processing || results.length > 0) && (
-              <div>
-                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-                  <span>{results.length} / {locations.length} processed</span>
-                  <span>{successCount} OK{errorCount > 0 ? `, ${errorCount} failed` : ''}</span>
+              <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--color-rule)' }}>
+                <div className="flex items-baseline justify-between mb-2 text-[0.65rem] uppercase tracking-[0.24em] font-mono"
+                     style={{ color: 'var(--color-ink-muted)' }}>
+                  <span>
+                    <span className="fg-numeral text-base mr-1.5" style={{ color: 'var(--color-ink)' }}>{results.length}</span>
+                    / {locations.length} processed
+                  </span>
+                  <span>
+                    <span style={{ color: '#4a7c59' }}>{successCount} ok</span>
+                    {errorCount > 0 && (
+                      <>
+                        {' · '}<span style={{ color: '#991b1b' }}>{errorCount} failed</span>
+                      </>
+                    )}
+                  </span>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
-                  <div
-                    className="h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%`, backgroundColor: 'var(--color-sage)' }}
-                  />
+                <div className="w-full h-1 rounded-full" style={{ backgroundColor: 'var(--color-rule-soft)' }}>
+                  <div className="h-full rounded-full transition-all duration-300"
+                       style={{ width: `${progress}%`, backgroundColor: 'var(--color-wheat)' }} />
                 </div>
               </div>
             )}
@@ -245,39 +362,73 @@ export default function BatchLookup() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-600 text-left text-slate-500 dark:text-slate-400">
-                      <th className="py-2 pr-3">Location</th>
-                      <th className="py-2 pr-3">Score</th>
-                      <th className="py-2 pr-3">Classification</th>
-                      <th className="py-2 pr-3">County</th>
-                      <th className="py-2 pr-3">RUCC</th>
-                      <th className="py-2">Status</th>
+                    <tr className="border-b" style={{ borderColor: 'var(--color-rule)' }}>
+                      {['#', 'Location', 'Score', 'Classification', 'County', 'RUCC', ''].map((h, i) => (
+                        <th key={h || i}
+                            className={`py-2.5 px-3 text-[0.65rem] uppercase tracking-[0.22em] font-mono font-normal ${i === 0 ? 'text-right w-12' : i === 2 ? 'text-center' : i === 5 ? 'text-center' : 'text-left'}`}
+                            style={{ color: 'var(--color-ink-muted)' }}>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {results.map((r, i) => (
-                      <tr key={i} className="border-b border-slate-100 dark:border-slate-700">
-                        <td className="py-2 pr-3 text-slate-800 dark:text-slate-200">{r.location}</td>
+                      <tr key={i} className="border-b border-dashed" style={{ borderColor: 'var(--color-rule-soft)' }}>
+                        <td className="py-2.5 px-3 text-right font-mono text-xs" style={{ color: 'var(--color-ink-muted)' }}>
+                          {String(i + 1).padStart(2, '0')}
+                        </td>
+                        <td className="py-2.5 px-3 fg-display text-sm" style={{ color: 'var(--color-ink)' }}>
+                          {r.location}
+                        </td>
                         {r.error ? (
                           <>
-                            <td colSpan={4} className="py-2 pr-3 text-red-600 dark:text-red-400 text-xs">{r.error}</td>
-                            <td className="py-2"><AlertCircle className="w-4 h-4 text-red-500" /></td>
+                            <td colSpan={3} className="py-2.5 px-3 font-mono text-xs italic" style={{ color: '#991b1b' }}>
+                              {r.error}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">—</td>
+                            <td className="py-2.5 px-3 text-center">
+                              <AlertCircle className="w-4 h-4 mx-auto" style={{ color: '#991b1b' }} />
+                            </td>
                           </>
                         ) : (
                           <>
-                            <td className="py-2 pr-3 font-bold text-slate-800 dark:text-slate-100">{r.data.overallScore}</td>
-                            <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{r.data.classification?.label}</td>
-                            <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{r.data.countyName}</td>
-                            <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{r.data.rucc ?? '—'}</td>
-                            <td className="py-2"><CheckCircle className="w-4 h-4 text-green-600" /></td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="fg-numeral text-xl" style={{ color: tierColor(r.data.overallScore) }}>
+                                {r.data.overallScore}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-[0.65rem] uppercase tracking-[0.2em] font-mono"
+                                style={{ color: tierColor(r.data.overallScore) }}>
+                              {r.data.classification?.label}
+                            </td>
+                            <td className="py-2.5 px-3 text-sm" style={{ color: 'var(--color-ink)' }}>
+                              {r.data.countyName}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-xs" style={{ color: 'var(--color-ink)' }}>
+                              {r.data.rucc ?? '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <CheckCircle className="w-4 h-4 mx-auto" style={{ color: '#4a7c59' }} />
+                            </td>
                           </>
                         )}
                       </tr>
                     ))}
                     {processing && results.length < locations.length && (
                       <tr>
-                        <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">{locations[results.length]}</td>
-                        <td colSpan={5} className="py-2"><Loader className="w-4 h-4 animate-spin text-slate-400" /></td>
+                        <td className="py-2.5 px-3 text-right font-mono text-xs" style={{ color: 'var(--color-ink-muted)' }}>
+                          {String(results.length + 1).padStart(2, '0')}
+                        </td>
+                        <td className="py-2.5 px-3 italic" style={{ color: 'var(--color-ink-muted)', fontFamily: 'var(--font-display)' }}>
+                          {locations[results.length]}
+                        </td>
+                        <td colSpan={5} className="py-2.5 px-3">
+                          <span className="flex items-center gap-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-wheat)' }}>
+                            <Loader className="w-3.5 h-3.5 animate-spin" />
+                            Analyzing…
+                          </span>
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -285,27 +436,38 @@ export default function BatchLookup() {
               </div>
             )}
 
-            {/* Download button */}
+            {/* Export */}
             {results.length > 0 && !processing && (
-              <button
-                onClick={() => exportResultsCSV(results)}
-                className="flex items-center space-x-2 px-5 py-2.5 text-white rounded-xl text-sm"
-                style={{ backgroundColor: 'var(--color-forest)' }}
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Results CSV</span>
-              </button>
+              <div className="px-5 py-4 border-t flex items-center justify-between gap-3"
+                   style={{ borderColor: 'var(--color-rule)' }}>
+                <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  Ready &mdash; 11 columns &middot; {results.length} rows
+                </span>
+                <button
+                  onClick={() => exportResultsCSV(results)}
+                  className="flex items-center gap-2 px-5 py-2 rounded-md text-[0.7rem] uppercase tracking-wider font-mono"
+                  style={{ backgroundColor: 'var(--color-wheat)', color: '#1a3a2a' }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Results CSV</span>
+                </button>
+              </div>
             )}
           </div>
-        )}
+        </section>
+      )}
 
-        {error && (
-          <div className="mt-4 flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="text-sm">{error}</span>
+      {/* ── Error banner ──────────────────────────────────────────── */}
+      {error && (
+        <div className="rounded-md border-l-4 px-4 py-3 text-sm flex items-start gap-2"
+             style={{ borderColor: '#991b1b', backgroundColor: 'var(--color-parchment)', color: '#991b1b' }}>
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-1.5">Error</span>
+            {error}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

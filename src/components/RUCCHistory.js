@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
 
-const RUCC_COLORS = {
-  1: '#991b1b', 2: '#b91c1c', 3: '#dc2626',
-  4: '#d97706', 5: '#f59e0b', 6: '#fbbf24',
-  7: '#16a34a', 8: '#15803d', 9: '#166534'
+const RUCC_TIER_COLOR = (code) => {
+  if (!code) return 'var(--color-sage)';
+  if (code <= 3) return '#991b1b';
+  if (code <= 5) return '#b45309';
+  if (code <= 7) return '#4a7c59';
+  return '#1a5c2e';
 };
 
 const RUCC_SHORT = {
   1: 'Metro 1M+', 2: 'Metro 250K–1M', 3: 'Metro <250K',
   4: 'Nonmetro 20K+ adj', 5: 'Nonmetro 20K+', 6: 'Nonmetro 5K–20K adj',
-  7: 'Nonmetro 5K–20K', 8: 'Rural adj', 9: 'Rural remote'
+  7: 'Nonmetro 5K–20K', 8: 'Rural adj', 9: 'Rural remote',
 };
 
 const VINTAGES = ['1974', '1983', '1993', '2003', '2013', '2023'];
@@ -22,16 +24,20 @@ function loadHistoricalData() {
   if (_histData) return Promise.resolve(_histData);
   if (_histPromise) return _histPromise;
   _histPromise = fetch(`${process.env.PUBLIC_URL}/data/rucc_historical.json`)
-    .then(r => {
+    .then((r) => {
       if (!r.ok) throw new Error('Failed to load historical RUCC data');
       return r.json();
     })
-    .then(d => { _histData = d; _histPromise = null; return d; });
+    .then((d) => {
+      _histData = d;
+      _histPromise = null;
+      return d;
+    });
   return _histPromise;
 }
 
 function getTrend(codes) {
-  const available = VINTAGES.filter(v => codes[v] != null);
+  const available = VINTAGES.filter((v) => codes[v] != null);
   if (available.length < 2) return null;
   const first = codes[available[0]];
   const last = codes[available[available.length - 1]];
@@ -50,7 +56,7 @@ export default function RUCCHistory({ fips }) {
     setLoading(true);
     setError(false);
     loadHistoricalData()
-      .then(data => {
+      .then((data) => {
         const key = String(fips).padStart(5, '0');
         setHistory(data[key] || null);
         setLoading(false);
@@ -64,7 +70,7 @@ export default function RUCCHistory({ fips }) {
   if (!fips || loading) return null;
   if (error || !history) return null;
 
-  const availableVintages = VINTAGES.filter(v => history[v] != null);
+  const availableVintages = VINTAGES.filter((v) => history[v] != null);
   if (availableVintages.length === 0) return null;
 
   const trend = getTrend(history);
@@ -74,107 +80,127 @@ export default function RUCCHistory({ fips }) {
   const trendLabel = trend === 'urbanizing' ? 'Urbanizing'
     : trend === 'ruralizing' ? 'Becoming more rural'
     : 'Stable';
-  const trendColor = trend === 'urbanizing' ? 'text-red-600'
-    : trend === 'ruralizing' ? 'text-green-600'
-    : 'text-slate-500';
+  const trendColor = trend === 'urbanizing' ? '#b45309'
+    : trend === 'ruralizing' ? '#4a7c59'
+    : 'var(--color-sage)';
 
-  // Detect big 2013→2023 jump that's likely methodology, not real change
-  const methodNote = history['2013'] != null && history['2023'] != null
-    && Math.abs(history['2023'] - history['2013']) >= 2;
+  const methodNote =
+    history['2013'] != null && history['2023'] != null &&
+    Math.abs(history['2023'] - history['2013']) >= 2;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100" style={{ fontFamily: 'var(--font-display)' }}>
-          RUCC History (1974–2023)
-        </h3>
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-6 sm:p-8 border border-[rgba(26,58,42,0.1)] dark:border-slate-700">
+      <div className="fg-rule mb-5">
+        <span>Exhibit C</span>
+        <span>RUCC History &mdash; 1974 / 2023</span>
+      </div>
+
+      <div className="flex items-end justify-between mb-5 gap-4">
+        <div>
+          <h3 className="fg-display text-3xl leading-tight" style={{ color: 'var(--color-ink)' }}>
+            Classification over <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>time</em>
+          </h3>
+          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+            Six decennial revisions &middot; USDA ERS / NCI SEER
+          </p>
+        </div>
         {trend && (
-          <div className={`flex items-center gap-1.5 text-sm font-medium ${trendColor}`}>
-            <TrendIcon className="w-4 h-4" />
-            {trendLabel}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded border"
+               style={{ borderColor: trendColor, color: trendColor }}>
+            <TrendIcon className="w-3.5 h-3.5" />
+            <span className="text-[0.65rem] uppercase tracking-wider font-mono">{trendLabel}</span>
           </div>
         )}
       </div>
 
-      {/* Timeline */}
+      {/* Timeline — field-guide bars */}
       <div className="overflow-x-auto">
-        <div className="flex items-end gap-1 min-w-[400px]" style={{ height: '160px' }}>
+        <div className="flex items-end gap-2 min-w-[440px]" style={{ height: '180px' }}>
           {VINTAGES.map((yr, i) => {
             const code = history[yr];
             if (code == null) {
               return (
                 <div key={yr} className="flex-1 flex flex-col items-center justify-end">
-                  <div className="w-full rounded-t-md bg-slate-100 dark:bg-slate-700" style={{ height: '20px' }} />
-                  <div className="text-xs text-slate-400 mt-2 font-medium">{yr}</div>
-                  <div className="text-[10px] text-slate-300">N/A</div>
+                  <div className="w-full rounded-t-sm" style={{ height: '18px', backgroundColor: 'var(--color-rule-soft)' }} />
+                  <div className="mt-2 text-[0.65rem] uppercase tracking-wider font-mono" style={{ color: 'var(--color-ink-muted)' }}>{yr}</div>
+                  <div className="text-[0.6rem] font-mono" style={{ color: 'var(--color-ink-subtle)' }}>n/a</div>
                 </div>
               );
             }
-
-            // Bar height proportional to RUCC code (1=short, 9=tall)
-            const barHeight = 20 + (code / 9) * 100;
+            const barHeight = 28 + (code / 9) * 110;
             const prevCode = i > 0 ? history[VINTAGES[i - 1]] : null;
             const changed = prevCode != null && prevCode !== code;
+            const color = RUCC_TIER_COLOR(code);
 
             return (
               <div key={yr} className="flex-1 flex flex-col items-center justify-end group relative">
-                {/* Tooltip on hover */}
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs rounded-md px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
-                  RUCC {code}: {RUCC_SHORT[code]}
+                {/* Tooltip */}
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-white text-[0.7rem] rounded-md px-2 py-1 whitespace-nowrap z-10 pointer-events-none"
+                     style={{ backgroundColor: 'var(--color-forest)' }}>
+                  RUCC {code} &middot; {RUCC_SHORT[code]}
                 </div>
 
-                {/* Change arrow */}
+                {/* Change indicator */}
                 {changed && (
-                  <div className={`text-[10px] font-bold mb-1 ${code > prevCode ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className="text-[0.6rem] font-mono mb-1 uppercase tracking-wider"
+                       style={{ color: code > prevCode ? '#4a7c59' : '#b45309' }}>
                     {code > prevCode ? '\u2191' : '\u2193'}{Math.abs(code - prevCode)}
                   </div>
                 )}
 
-                {/* Bar */}
+                {/* Bar with inset numeral */}
                 <div
-                  className="w-full rounded-t-md transition-all duration-300 flex items-center justify-center"
+                  className="w-full rounded-t-sm transition-all duration-300 flex items-end justify-center pb-1"
                   style={{
                     height: `${barHeight}px`,
-                    backgroundColor: RUCC_COLORS[code],
-                    opacity: 0.85,
-                    border: changed ? '2px solid #1e293b' : 'none'
+                    backgroundColor: color,
+                    outline: changed ? '1.5px dashed rgba(26,58,42,0.55)' : 'none',
+                    outlineOffset: changed ? '2px' : 0,
                   }}
                 >
-                  <span className="text-white text-sm font-bold drop-shadow-sm">{code}</span>
+                  <span className="fg-numeral text-xl text-white" style={{ opacity: 0.95 }}>{code}</span>
                 </div>
 
-                {/* Year label */}
-                <div className="text-xs text-slate-600 dark:text-slate-400 mt-2 font-medium">{yr}</div>
+                <div className="mt-2 text-[0.65rem] uppercase tracking-wider font-mono" style={{ color: 'var(--color-ink-muted)' }}>{yr}</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Legend row */}
-      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
-        <span>1–3 = Metro</span>
-        <span>4–5 = Nonmetro urban</span>
-        <span>6–7 = Nonmetro town</span>
-        <span>8–9 = Rural</span>
+      {/* Legend */}
+      <div className="mt-5 pt-4 border-t border-dashed border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] flex flex-wrap gap-x-5 gap-y-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+           style={{ color: 'var(--color-ink-muted)' }}>
+        {[
+          ['1–3', 'Metro',          '#991b1b'],
+          ['4–5', 'Nonmetro urban', '#b45309'],
+          ['6–7', 'Nonmetro town',  '#4a7c59'],
+          ['8–9', 'Rural',          '#1a5c2e'],
+        ].map(([range, label, c]) => (
+          <span key={label} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: c }} />
+            {range} · {label}
+          </span>
+        ))}
       </div>
 
       {/* Methodology note */}
       {methodNote && (
-        <div className="mt-3 flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
-          <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+        <div className="mt-4 rounded-md border-l-4 px-4 py-3 text-sm flex items-start gap-2"
+             style={{ borderColor: 'var(--color-wheat)', backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+          <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-wheat)' }} />
           <span>
-            The 2023 RUCC raised the urban population threshold from 2,500 to 5,000.
-            Large shifts between 2013 and 2023 may reflect this methodology change
-            rather than actual urbanization or ruralization.
+            <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-1.5" style={{ color: 'var(--color-ink-muted)' }}>Note</span>
+            The 2023 RUCC raised the urban population threshold from 2,500 to 5,000. Large shifts
+            between 2013 and 2023 may reflect this methodology change rather than actual
+            urbanization or ruralization.
           </span>
         </div>
       )}
 
       {/* Source */}
-      <div className="mt-3 text-[10px] text-slate-400">
-        Source: USDA Economic Research Service Rural-Urban Continuum Codes, via NCI SEER.
-        Code 0 (central metro, used 1974–1993) recoded to 1.
+      <div className="mt-3 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)', opacity: 0.7 }}>
+        Source &mdash; USDA ERS Rural-Urban Continuum Codes via NCI SEER · Code 0 (1974–1993) recoded to 1
       </div>
     </div>
   );

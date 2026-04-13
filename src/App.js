@@ -3,7 +3,7 @@ import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap, Wifi,
   Building2, Tractor, Heart, DollarSign, AlertCircle,
-  BookOpen, FlaskConical, Users, ExternalLink, Scale, Database, Calculator
+  BookOpen, FlaskConical, ExternalLink, Database, Calculator
 } from 'lucide-react';
 
 import LeafletMap from './components/LeafletMap';
@@ -14,6 +14,8 @@ import PlacesLikeThis from './components/PlacesLikeThis';
 import EmbedWidget from './components/EmbedWidget';
 import RUCCHistory from './components/RUCCHistory';
 import CompareTable from './components/CompareTable';
+import ScoreDial from './components/ScoreDial';
+import SpecimenCard from './components/SpecimenCard';
 
 import {
   geocodeWithCache,
@@ -143,6 +145,7 @@ const RuralityApp = () => {
   const [trendsData, setTrendsData]     = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [showDataSources, setShowDataSources] = useState(false);
+  const [specimenOpen, setSpecimenOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState(() => {
     try { return JSON.parse(localStorage.getItem('rurality-recent') || '[]'); }
@@ -392,14 +395,37 @@ const RuralityApp = () => {
   const shareResults = async () => {
     if (!ruralityData || !currentLocation) return;
     const shareUrl = `${window.location.origin}${window.location.pathname}?q=${encodeURIComponent(searchQuery || currentLocation)}`;
-    const text = `${currentLocation} has a Rural Index score of ${ruralityData.overallScore}/100 (${getRuralityLevel(ruralityData.overallScore).level})`;
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Rurality.app', text, url: shareUrl }); }
-      catch { /* cancelled */ }
-    } else {
-      navigator.clipboard.writeText(`${text} — ${shareUrl}`);
-      alert('Link copied to clipboard!');
+    const level = getRuralityLevel(ruralityData.overallScore).level;
+    const cls = ruralityData.classifications || {};
+    // Multi-line "field report" for clipboard / email / social
+    const report = [
+      `§ FIELD REPORT · RURALITY.APP`,
+      `──────────────────────────────`,
+      `${currentLocation}`,
+      `Rural Index  ${ruralityData.overallScore}/100  ·  ${level}`,
+      `Confidence   ${ruralityData.confidence}`,
+      cls.rucc?.code != null ? `RUCC 2023    ${cls.rucc.code} — ${cls.rucc.description || ''}`.trim() : null,
+      cls.ruca?.code != null ? `RUCA 2020    ${cls.ruca.code} — ${cls.ruca.description || ''}`.trim() : null,
+      cls.omb?.label         ? `OMB          ${cls.omb.label}` : null,
+      `──────────────────────────────`,
+      shareUrl,
+    ].filter(Boolean).join('\n');
+
+    // Always write the rich report to the clipboard first so the full format
+    // is preserved regardless of what a downstream share sheet decides to copy.
+    try { await navigator.clipboard.writeText(report); } catch {}
+
+    // On platforms with a native share sheet (usually mobile), offer it too,
+    // passing the FULL report as the text so paste targets get the same content.
+    // Only offer share on touch devices — desktop Chrome's share sheet often
+    // discards the text and copies only the URL.
+    const isTouch = typeof window !== 'undefined' &&
+                    (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
+    if (isTouch && navigator.share) {
+      try { await navigator.share({ title: 'Rurality.app', text: report, url: shareUrl }); return; }
+      catch { /* cancelled — clipboard still has the report */ }
     }
+    alert('Field report copied to clipboard');
   };
 
   const exportData = () => {
@@ -434,31 +460,331 @@ const RuralityApp = () => {
   const printReport = () => {
     if (!ruralityData || !currentLocation) return;
     const level = getRuralityLevel(ruralityData.overallScore);
-    const metrics = Object.entries(ruralityData.metrics)
-      .map(([, m]) => `<tr><td style="padding:4px 12px 4px 0">${m.label}</td><td style="text-align:right;padding:4px 0">${m.value}</td></tr>`)
-      .join('');
     const demo = ruralityData.demographics;
-    const html = `<!DOCTYPE html><html><head><title>Rurality Report: ${currentLocation}</title>
-      <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#1e293b;line-height:1.6}
-      h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin-top:24px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
-      .score{font-size:48px;font-weight:bold;margin:16px 0}.meta{color:#64748b;font-size:13px}
-      table{border-collapse:collapse;width:100%}td{padding:6px 12px 6px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
-      .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
-      @media print{body{margin:20px}}</style></head><body>
+    const score = ruralityData.overallScore;
+    const tierColor =
+      score >= 80 ? '#1a5c2e' :
+      score >= 60 ? '#4a7c59' :
+      score >= 40 ? '#a17321' :
+      score >= 20 ? '#b45309' :
+                    '#991b1b';
+
+    const metricsRows = Object.entries(ruralityData.metrics).map(([, m]) => {
+      const mColor = m.score >= 80 ? '#1a5c2e' : m.score >= 60 ? '#4a7c59' : m.score >= 40 ? '#a17321' : m.score >= 20 ? '#b45309' : '#991b1b';
+      const val = typeof m.value === 'number' && m.value % 1 !== 0 ? m.value.toFixed(1) : m.value;
+      return `<tr>
+        <td class="label">${m.label}</td>
+        <td class="value">${val}</td>
+        <td class="score-cell"><span class="score-num" style="color:${mColor}">${m.score}</span><span class="score-of">/100</span></td>
+      </tr>`;
+    }).join('');
+
+    const demoRows = [
+      ['Population',         demo?.population?.toLocaleString() ?? 'N/A'],
+      ['Median Income',      demo?.medianIncome ? '$' + demo.medianIncome.toLocaleString() : 'N/A'],
+      ['Median Age',         demo?.medianAge ?? 'N/A'],
+      ['Unemployment Rate',  demo?.unemploymentRate ? demo.unemploymentRate + '%' : 'N/A'],
+    ].map(([k, v]) => `<tr><td class="label">${k}</td><td class="value" colspan="2">${v}</td></tr>`).join('');
+
+    const classifications = ruralityData.classifications || {};
+    const classificationsBlock = `
+      <div class="cls-grid">
+        <div class="cls-item">
+          <div class="cls-title">RUCC 2023</div>
+          <div class="cls-code" style="color:${tierColor}">${classifications.rucc?.code ?? '—'}</div>
+          <div class="cls-desc">${classifications.rucc?.description ?? 'Not available'}</div>
+        </div>
+        <div class="cls-item">
+          <div class="cls-title">RUCA 2020</div>
+          <div class="cls-code" style="color:${tierColor}">${classifications.ruca?.code ?? '—'}</div>
+          <div class="cls-desc">${classifications.ruca?.description ?? 'Not available'}</div>
+        </div>
+        <div class="cls-item">
+          <div class="cls-title">OMB Designation</div>
+          <div class="cls-badge" style="color:${tierColor};border-color:${tierColor}">${classifications.omb?.label ?? '—'}</div>
+          <div class="cls-desc">Metro / Micro / Nonmetro</div>
+        </div>
+      </div>`;
+
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const html = `<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<title>Field Report — ${currentLocation}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --forest: #1a3a2a;
+    --sage: #4a7c59;
+    --wheat: #d4a843;
+    --cream: #faf8f4;
+    --parchment: #f3f0e8;
+    --tier: ${tierColor};
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    background: var(--cream);
+    color: #1e293b;
+    margin: 0;
+    padding: 48px;
+    line-height: 1.55;
+  }
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid rgba(26,58,42,0.18);
+    padding: 44px 48px 36px;
+    position: relative;
+  }
+  .page::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border: 1px dashed rgba(26,58,42,0.18);
+    pointer-events: none;
+  }
+  .rule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 28px;
+  }
+  .rule::before, .rule::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.4;
+  }
+  .masthead { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end; border-bottom: 1px solid rgba(26,58,42,0.2); padding-bottom: 24px; }
+  h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 38px;
+    line-height: 0.98;
+    margin: 0 0 8px;
+    color: var(--forest);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 10px;
+  }
+  .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--sage);
+  }
+  .stamp-block {
+    text-align: center;
+    border: 2px solid var(--tier);
+    padding: 14px 22px;
+    border-radius: 4px;
+    min-width: 160px;
+  }
+  .stamp-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 6px;
+  }
+  .stamp-score {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 58px;
+    line-height: 0.9;
+    font-variant-numeric: oldstyle-nums;
+    letter-spacing: -0.04em;
+    color: var(--tier);
+  }
+  .stamp-tier {
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--tier);
+    font-weight: 500;
+  }
+  h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--forest);
+    margin: 28px 0 10px;
+  }
+  .section-rule {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 26px 0 14px;
+  }
+  .section-rule .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--sage);
+    flex-shrink: 0;
+  }
+  .section-rule .ln { flex: 1; height: 1px; background: rgba(26,58,42,0.25); }
+  table { border-collapse: collapse; width: 100%; }
+  td {
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(26,58,42,0.18);
+    font-size: 12.5px;
+  }
+  td.label {
+    color: var(--sage);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    width: 40%;
+  }
+  td.value {
+    font-family: 'Source Serif 4', serif;
+    font-variant-numeric: oldstyle-nums;
+    color: var(--forest);
+    font-size: 18px;
+  }
+  td.score-cell {
+    width: 22%;
+    text-align: right;
+    font-family: 'Source Serif 4', serif;
+  }
+  .score-num {
+    font-size: 20px;
+    font-variant-numeric: oldstyle-nums;
+  }
+  .score-of {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--sage);
+    margin-left: 4px;
+  }
+  .cls-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .cls-item {
+    background: var(--cream);
+    border: 1px solid rgba(26,58,42,0.15);
+    padding: 14px;
+  }
+  .cls-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 6px;
+  }
+  .cls-code {
+    font-family: 'Source Serif 4', serif;
+    font-size: 42px;
+    font-variant-numeric: oldstyle-nums;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    margin: 4px 0 6px;
+  }
+  .cls-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid;
+    border-radius: 3px;
+    margin: 10px 0;
+  }
+  .cls-desc {
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.4;
+  }
+  .colophon {
+    margin-top: 36px;
+    padding-top: 18px;
+    border-top: 2px solid var(--wheat);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--sage);
+    line-height: 1.8;
+  }
+  .colophon .by {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    text-transform: none;
+    font-size: 11.5px;
+    letter-spacing: 0;
+    color: var(--forest);
+    margin-top: 8px;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { border: none; padding: 30px 40px; max-width: none; }
+    .page::before { inset: 14px; }
+    @page { margin: 18mm; }
+  }
+</style>
+</head><body>
+<div class="page">
+  <div class="rule">
+    <span>№ 01</span>
+    <span>Field Report</span>
+    <span>Rurality.app &middot; ${today}</span>
+  </div>
+
+  <div class="masthead">
+    <div>
+      <div class="kicker">A Rurality Index Report</div>
       <h1>${currentLocation}</h1>
-      <p class="meta">Rurality Report generated ${new Date().toLocaleDateString()} via rurality.app</p>
-      <div class="score">${ruralityData.overallScore}<span style="font-size:16px;color:#64748b"> / 100</span></div>
-      <p><strong>${level.level}</strong> (Confidence: ${ruralityData.confidence})</p>
-      <h2>Metrics</h2><table>${metrics}</table>
-      <h2>Demographics</h2><table>
-      <tr><td>Population</td><td style="text-align:right">${demo?.population?.toLocaleString() ?? 'N/A'}</td></tr>
-      <tr><td>Median Income</td><td style="text-align:right">${demo?.medianIncome ? '$' + demo.medianIncome.toLocaleString() : 'N/A'}</td></tr>
-      <tr><td>Median Age</td><td style="text-align:right">${demo?.medianAge ?? 'N/A'}</td></tr>
-      <tr><td>Unemployment Rate</td><td style="text-align:right">${demo?.unemploymentRate ? demo.unemploymentRate + '%' : 'N/A'}</td></tr>
-      </table>
-      <div class="footer">Source: rurality.app | USDA ERS RUCC 2023, RUCA 2020 | Census ACS 2022<br/>
-      Cameron Wimpy, Institute for Rural Initiatives, Arkansas State University</div>
-      </body></html>`;
+      <div class="meta">Confidence &middot; <em style="font-family:'Source Serif 4',serif;font-style:italic;text-transform:none;letter-spacing:0;">${ruralityData.confidence}</em></div>
+    </div>
+    <div class="stamp-block">
+      <div class="stamp-label">Rurality / 100</div>
+      <div class="stamp-score">${score}</div>
+      <div class="stamp-tier">${level.level}</div>
+    </div>
+  </div>
+
+  <div class="section-rule"><span class="lbl">Exhibit A &middot; Indicators</span><span class="ln"></span></div>
+  <table>${metricsRows}</table>
+
+  <div class="section-rule"><span class="lbl">Exhibit B &middot; Demographics</span><span class="ln"></span></div>
+  <table>${demoRows}</table>
+
+  <div class="section-rule"><span class="lbl">Exhibit C &middot; Official Classifications</span><span class="ln"></span></div>
+  ${classificationsBlock}
+
+  <div class="colophon">
+    Source &mdash; Rurality.app &middot; USDA ERS RUCC 2023 &middot; USDA ERS RUCA 2020 &middot; U.S. Census ACS 2022
+    <div class="by">Cameron Wimpy &middot; Institute for Rural Initiatives, Arkansas State University</div>
+  </div>
+</div>
+</body></html>`;
     const w = window.open('', '_blank');
     w.document.write(html);
     w.document.close();
@@ -470,89 +796,100 @@ const RuralityApp = () => {
     if (!classifications) return null;
     const { rucc, ruca, omb, countyName, postcode } = classifications;
 
-    const ScoreBar = ({ score, max = 100 }) => (
-      <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
-        <div
-          className="bg-gradient-to-r from-green-400 to-green-600 h-1.5 rounded-full"
-          style={{ width: `${Math.round((score / max) * 100)}%` }}
-        />
-      </div>
-    );
+    const scoreColor = (s) => s == null ? 'var(--color-sage)'
+      : s >= 80 ? '#1a5c2e'
+      : s >= 60 ? '#4a7c59'
+      : s >= 40 ? '#a17321'
+      : s >= 20 ? '#b45309'
+      :           '#991b1b';
 
-    const IndexCard = ({ title, badge, badgeColor, code, description, score, footnote }) => (
-      <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex flex-col gap-2">
+    const IndexCard = ({ title, code, badge, description, score, footnote }) => (
+      <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] p-4 flex flex-col gap-3"
+           style={{ backgroundColor: 'var(--color-cream)' }}>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{title}</span>
+          <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>{title}</span>
           {badge && (
-            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${badgeColor}`}>
+            <span className="text-[0.65rem] uppercase tracking-wider font-mono px-2 py-0.5 rounded border"
+                  style={{ color: scoreColor(score), borderColor: scoreColor(score) }}>
               {badge}
             </span>
           )}
         </div>
         {code !== null && code !== undefined ? (
           <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-800 dark:text-slate-100">{code}</span>
+            <div className="flex items-baseline gap-3">
+              <span className="fg-numeral text-5xl" style={{ color: scoreColor(score) }}>{code}</span>
               {score !== null && score !== undefined && (
-                <span className="text-xs text-slate-500 dark:text-slate-400">score {score}/100</span>
+                <span className="text-[0.65rem] uppercase tracking-wider font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  score {score}/100
+                </span>
               )}
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{description}</p>
-            {score !== null && score !== undefined && <ScoreBar score={score} />}
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug">{description}</p>
+            {score !== null && score !== undefined && (
+              <div className="w-full h-1 rounded-full" style={{ backgroundColor: 'var(--color-rule-soft)' }}>
+                <div className="h-full rounded-full" style={{ width: `${score}%`, backgroundColor: scoreColor(score) }} />
+              </div>
+            )}
           </>
         ) : (
-          <p className="text-sm text-slate-400 italic">Not available for this location</p>
+          <p className="text-sm italic" style={{ color: 'var(--color-ink-muted)' }}>Not available for this location</p>
         )}
-        {footnote && <p className="text-xs text-slate-400">{footnote}</p>}
+        {footnote && (
+          <p className="text-[0.65rem] uppercase tracking-[0.22em] font-mono leading-relaxed" style={{ color: 'var(--color-ink-muted)', opacity: 0.7 }}>
+            {footnote}
+          </p>
+        )}
       </div>
     );
 
-    // Composite RRI bar
-    const compositeColor = compositeScore >= 80 ? 'text-green-800 bg-green-200 border-green-300'
-      : compositeScore >= 60 ? 'text-green-700 bg-green-100 border-green-300'
-      : compositeScore >= 40 ? 'text-yellow-700 bg-yellow-100 border-yellow-300'
-      : compositeScore >= 20 ? 'text-orange-700 bg-orange-100 border-orange-300'
-      : 'text-red-700 bg-red-100 border-red-300';
-
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-6 sm:p-8 border border-[rgba(26,58,42,0.1)] dark:border-slate-700">
+        <div className="fg-rule mb-5">
+          <span>Exhibit B</span>
+          <span className="hidden sm:inline">Official Rurality Classifications</span>
+          <span className="sm:hidden">Classifications</span>
+        </div>
+        <div className="flex items-start justify-between mb-6 gap-4">
           <div>
-            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Official Rurality Classifications</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {countyName ? `${countyName} County` : ''}
-              {postcode ? ` · ZIP ${postcode}` : ''}
-            </p>
+            <h3 className="fg-display text-3xl leading-tight" style={{ color: 'var(--color-ink)' }}>
+              Official Classifications
+            </h3>
+            {(countyName || postcode) && (
+              <p className="mt-1 text-[0.7rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                {countyName ? `${countyName} County` : ''}
+                {postcode ? ` · ZIP ${postcode}` : ''}
+              </p>
+            )}
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${compositeColor}`}>
-            RRI {compositeScore}
+          <span className="inline-flex items-baseline gap-2 px-3 py-1.5 rounded border"
+                style={{ borderColor: scoreColor(compositeScore), color: scoreColor(compositeScore) }}>
+            <span className="text-[0.65rem] uppercase tracking-wider font-mono">RRI</span>
+            <span className="fg-numeral text-2xl">{compositeScore}</span>
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <IndexCard
             title="RUCC 2023"
-            badge={rucc?.code !== null && rucc?.code !== undefined ? `Code ${rucc.code}` : 'N/A'}
-            badgeColor={rucc?.color ?? 'text-slate-500 bg-slate-100 border-slate-200'}
             code={rucc?.code ?? null}
+            badge={rucc?.code !== null && rucc?.code !== undefined ? `Code ${rucc.code}` : 'N/A'}
             description={rucc?.description ?? ''}
             score={rucc?.score ?? null}
-            footnote="USDA Rural-Urban Continuum Code — county level (1–9)"
+            footnote="USDA Rural-Urban Continuum — county level (1–9)"
           />
           <IndexCard
             title="RUCA 2020"
-            badge={ruca?.code !== null && ruca?.code !== undefined ? `Code ${ruca.code}` : 'N/A'}
-            badgeColor={ruca?.color ?? 'text-slate-500 bg-slate-100 border-slate-200'}
             code={ruca?.code ?? null}
+            badge={ruca?.code !== null && ruca?.code !== undefined ? `Code ${ruca.code}` : 'N/A'}
             description={ruca?.description ?? ''}
             score={ruca?.score ?? null}
-            footnote="USDA Rural-Urban Commuting Area Code — ZIP/ZCTA level (1–10)"
+            footnote="USDA Rural-Urban Commuting Area — ZIP/ZCTA (1–10)"
           />
           <IndexCard
             title="OMB Designation"
-            badge={omb?.label ?? 'N/A'}
-            badgeColor={omb?.color ?? 'text-slate-500 bg-slate-100 border-slate-200'}
             code={null}
+            badge={omb?.label ?? 'N/A'}
             description={
               omb?.label === 'Metropolitan'   ? 'Core-based statistical area with urban core ≥50,000' :
               omb?.label === 'Micropolitan'   ? 'Core-based statistical area with urban core 10,000–49,999' :
@@ -560,37 +897,39 @@ const RuralityApp = () => {
               'Unable to determine from RUCC'
             }
             score={null}
-            footnote="Office of Management & Budget metro/nonmetro classification"
+            footnote="OMB metro / micro / nonmetro classification"
           />
-          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 border border-slate-200 dark:border-slate-600 flex flex-col gap-2">
+          <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] p-4 flex flex-col gap-3"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Composite RRI</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${compositeColor}`}>
+              <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>Composite RRI</span>
+              <span className="text-[0.65rem] uppercase tracking-wider font-mono px-2 py-0.5 rounded border italic"
+                    style={{ color: scoreColor(compositeScore), borderColor: scoreColor(compositeScore) }}>
                 {confidence}
               </span>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-800 dark:text-slate-100">{compositeScore}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">/ 100</span>
+            <div className="flex items-baseline gap-3">
+              <span className="fg-numeral text-5xl" style={{ color: scoreColor(compositeScore) }}>{compositeScore}</span>
+              <span className="text-[0.65rem] uppercase tracking-wider font-mono" style={{ color: 'var(--color-ink-muted)' }}>/ 100</span>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-snug">
               Weighted hybrid index combining RUCA, population density, distance to metro, and broadband access.
             </p>
-            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
-              <div
-                className="bg-gradient-to-r from-green-400 to-green-600 h-1.5 rounded-full"
-                style={{ width: `${compositeScore}%` }}
-              />
+            <div className="w-full h-1 rounded-full" style={{ backgroundColor: 'var(--color-rule-soft)' }}>
+              <div className="h-full rounded-full" style={{ width: `${compositeScore}%`, backgroundColor: scoreColor(compositeScore) }} />
             </div>
-            <p className="text-xs text-slate-400">Rurality.app composite methodology v2.0</p>
+            <p className="text-[0.65rem] uppercase tracking-[0.22em] font-mono leading-relaxed" style={{ color: 'var(--color-ink-muted)', opacity: 0.7 }}>
+              Rurality.app methodology v2.0
+            </p>
           </div>
         </div>
 
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-          <strong>Note:</strong> RUCC codes 1–3 = Metropolitan, 4–5 = Micropolitan, 6–9 = Nonmetro.
-          RUCA codes 1–3 = Metropolitan, 4–6 = Micropolitan, 7–10 = Rural/Small town.
-          OMB designation is derived from RUCC. The composite RRI reflects confidence level{' '}
-          <em>{confidence}</em> based on available data.
+        <div className="mt-5 rounded-md border-l-4 px-4 py-3 text-sm"
+             style={{ borderColor: 'var(--color-wheat)', backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+          <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Note</span>
+          RUCC 1–3 = Metropolitan, 4–5 = Micropolitan, 6–9 = Nonmetro. RUCA 1–3 = Metropolitan,
+          4–6 = Micropolitan, 7–10 = Rural/Small town. OMB designation is derived from RUCC. The
+          composite RRI reflects confidence level <em>{confidence}</em> based on available data.
         </div>
       </div>
     );
@@ -632,55 +971,118 @@ const RuralityApp = () => {
   };
 
   const MapView = () => (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-4">
-        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Interactive Map</h3>
-        <p className="text-sm text-slate-500 mt-1">Click anywhere on the map to analyze that location's rurality.</p>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 overflow-hidden">
-        <div className="h-[28rem] sm:h-[32rem]">
-          <LeafletMap
-            coordinates={ruralityData?.coordinates || null}
-            locationName={currentLocation}
-            score={ruralityData?.overallScore ?? null}
-            onMapClick={handleMapClick}
-            loading={loading}
-          />
+    <div className="space-y-10 sm:space-y-12 pb-8">
+      {/* ── Editorial masthead ─────────────────────────────────────── */}
+      <header className="topo-bg rounded-2xl border px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-12"
+              style={{ backgroundColor: 'var(--color-parchment)', borderColor: 'var(--color-rule)' }}>
+        <div className="fg-rule mb-8">
+          <span>§ Interactive Map</span>
+          <span className="hidden sm:inline">Click any location &middot; Open its report</span>
+          <span>Continental U.S.</span>
         </div>
-        <div className="p-4 bg-green-50 border-t border-green-100">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-            {[['3,143', 'US Counties'], ['RUCA 2020', 'Classification'], ['6+', 'Data Sources'], ['Free', 'Open Access']].map(([val, lbl]) => (
-              <div key={lbl}>
-                <div className="text-lg font-bold text-green-700">{val}</div>
-                <div className="text-xs text-slate-600 dark:text-slate-300">{lbl}</div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
+          <div className="lg:col-span-8">
+            <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
+              Drop a <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>pin</em> anywhere.
+            </h2>
+            <p className="mt-5 max-w-2xl text-base sm:text-lg leading-relaxed"
+               style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}>
+              Click anywhere on the map and the tool will reverse-geocode those coordinates,
+              resolve the containing county, and open a full field report for the location.
+            </p>
+          </div>
+          <aside className="lg:col-span-4">
+            <div className="pl-5 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-3 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                Coverage
+              </div>
+              {[
+                ['3,235', 'U.S. counties'],
+                ['41,146', 'ZIP Code Tabulation Areas'],
+                ['6+', 'federal data sources'],
+              ].map(([n, l], i, arr) => (
+                <div key={l} className={`flex items-baseline gap-3 ${i !== arr.length - 1 ? 'mb-2 pb-2 border-b border-dashed' : ''}`}
+                     style={i !== arr.length - 1 ? { borderColor: 'var(--color-rule)' } : {}}>
+                  <div className="fg-numeral text-2xl" style={{ color: 'var(--color-ink)' }}>{n}</div>
+                  <div className="text-xs uppercase tracking-wider" style={{ color: 'var(--color-ink-muted)' }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      {/* ── The Map Plate ─────────────────────────────────────────── */}
+      <section>
+        <div className="fg-rule mb-5">
+          <span>The Plate</span>
+          <span>Click to analyze &middot; Drag to pan &middot; Scroll to zoom</span>
+        </div>
+        <div className="rounded-lg overflow-hidden border"
+             style={{ backgroundColor: 'var(--color-cream)', borderColor: 'var(--color-rule)' }}>
+          <div className="relative h-[28rem] sm:h-[32rem]">
+            <LeafletMap
+              coordinates={ruralityData?.coordinates || null}
+              locationName={currentLocation}
+              score={ruralityData?.overallScore ?? null}
+              onMapClick={handleMapClick}
+              loading={loading}
+            />
+          </div>
+
+          {/* Stat strip — like a catalog footer */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 border-t" style={{ borderColor: 'var(--color-rule)' }}>
+            {[
+              ['3,235',     'U.S. counties'],
+              ['RUCA 2020', 'Classification anchor'],
+              ['6+',        'Federal data sources'],
+              ['Free',      'Open access'],
+            ].map(([val, lbl], i, arr) => (
+              <div key={lbl}
+                   className={`px-4 py-4 text-center ${i !== arr.length - 1 ? 'sm:border-r border-b sm:border-b-0' : ''}`}
+                   style={{ borderColor: 'var(--color-rule)' }}>
+                <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-1" style={{ color: 'var(--color-ink-muted)' }}>
+                  {lbl}
+                </div>
+                <div className="fg-numeral text-xl" style={{ color: 'var(--color-ink)' }}>{val}</div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 
   const TrendsView = () => {
-    // Helper: renders a simple bar chart for any numeric series
-    const MiniBarChart = ({ data, valueKey, color, formatVal, maxOverride }) => {
+    // Field-guide mini bar chart — SVG with mono tick labels
+    const MiniBarChart = ({ data, valueKey, color, formatVal }) => {
       const vals = data.map(d => d[valueKey]);
-      const max = maxOverride ?? Math.max(...vals);
+      const max = Math.max(...vals);
       const min = Math.min(...vals);
       const range = max - min || 1;
       return (
-        <div className="flex items-end justify-between gap-1 h-24">
-          {data.map(d => {
-            const pct = Math.max(4, Math.round(((d[valueKey] - min) / range) * 100));
+        <div className="flex items-end justify-between gap-1.5 h-28">
+          {data.map((d, i) => {
+            const pct = Math.max(6, Math.round(((d[valueKey] - min) / range) * 100));
+            const isLast = i === data.length - 1;
             return (
-              <div key={d.year} className="flex flex-col items-center flex-1 gap-1">
-                <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{formatVal(d[valueKey])}</div>
+              <div key={d.year} className="flex flex-col items-center flex-1 gap-1.5">
+                <div className="fg-numeral text-xs"
+                     style={{ color: isLast ? color : 'var(--color-sage)', opacity: isLast ? 1 : 0.7 }}>
+                  {formatVal(d[valueKey])}
+                </div>
                 <div
-                  className={`w-full rounded-t-md ${color}`}
-                  style={{ height: `${pct}%`, minHeight: '4px' }}
+                  className="w-full rounded-t-sm transition-all"
+                  style={{
+                    height: `${pct}%`,
+                    minHeight: '4px',
+                    backgroundColor: color,
+                    opacity: isLast ? 1 : 0.65,
+                  }}
                 />
-                <div className="text-xs text-slate-400">{d.year}</div>
+                <div className="text-[0.6rem] uppercase tracking-[0.2em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  {d.year}
+                </div>
               </div>
             );
           })}
@@ -694,565 +1096,768 @@ const RuralityApp = () => {
       const last  = data[data.length - 1][key];
       const diff  = last - first;
       const sign  = diff >= 0 ? '+' : '';
-      return `${sign}${fmt(diff)} since ${data[0].year}`;
+      return { text: `${sign}${fmt(diff)} since ${data[0].year}`, positive: diff >= 0, diff };
     };
 
+    const EmptyState = ({ icon: Icon, message, spin = false }) => (
+      <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] px-8 py-16 text-center"
+           style={{ backgroundColor: 'var(--color-cream)' }}>
+        {spin ? (
+          <div className="animate-spin w-8 h-8 rounded-full mx-auto mb-5"
+               style={{ borderWidth: '3px', borderStyle: 'solid', borderColor: 'var(--color-rule)', borderTopColor: 'var(--color-wheat)' }} />
+        ) : (
+          <Icon className="w-10 h-10 mx-auto mb-5" style={{ color: 'var(--color-ink-muted)', opacity: 0.5 }} />
+        )}
+        <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+          Field Report &middot; Trends
+        </div>
+        <p className="fg-display text-lg sm:text-xl italic" style={{ color: 'var(--color-ink)' }}>
+          {message}
+        </p>
+      </div>
+    );
+
     if (!locationMeta) {
-      return (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
-          <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 dark:text-slate-400">Search for a location to view historical trends</p>
-        </div>
-      );
+      return <EmptyState icon={TrendingUp} message="Search for a location to view historical trends." />;
     }
-
     if (trendsLoading) {
-      return (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full mx-auto mb-4" />
-          <p className="text-slate-500 dark:text-slate-400">Loading 2018–2022 Census ACS data…</p>
-        </div>
-      );
+      return <EmptyState icon={TrendingUp} message="Loading 2018–2022 Census ACS data…" spin />;
+    }
+    if (!trendsData || trendsData.length === 0) {
+      return <EmptyState icon={AlertCircle} message="Could not load historical data for this county." />;
     }
 
-    if (!trendsData || trendsData.length === 0) {
-      return (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-12 text-center">
-          <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 dark:text-slate-400">Could not load historical data for this county.</p>
-        </div>
-      );
-    }
+    const firstYr = trendsData[0].year;
+    const lastYr  = trendsData[trendsData.length - 1].year;
+    const popDelta = deltaLabel(trendsData, 'population',       v => Math.abs(v).toLocaleString());
+    const incDelta = deltaLabel(trendsData, 'medianIncome',     v => `$${Math.abs(v).toLocaleString()}`);
+    const uneDelta = deltaLabel(trendsData, 'unemploymentRate', v => `${Math.abs(v).toFixed(1)}pp`);
+
+    const metricColor = (delta, positiveIsGood) => {
+      if (!delta) return 'var(--color-sage)';
+      const good = positiveIsGood ? delta.positive : !delta.positive;
+      return good ? '#4a7c59' : '#b45309';
+    };
 
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-10 sm:space-y-12 pb-8">
+        {/* ── Editorial header ─────────────────────────────────────── */}
+        <header className="topo-bg rounded-2xl border border-[rgba(26,58,42,0.14)] dark:border-[rgba(255,255,255,0.08)] px-6 sm:px-10 pt-8 pb-8 sm:pt-10"
+                style={{ backgroundColor: 'var(--color-parchment)' }}>
+          <div className="fg-rule mb-6">
+            <span>§ Trends</span>
+            <span className="hidden sm:inline">Annual Census Readings</span>
+            <span>{firstYr} &middot; {lastYr}</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-end">
             <div>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">County Trends — {currentLocation}</h3>
-              <p className="text-sm text-slate-500 mt-0.5">
-                US Census Bureau ACS 5-Year Estimates · {trendsData[0].year}–{trendsData[trendsData.length - 1].year}
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+                Field Report
+              </div>
+              <h2 className="fg-display text-4xl sm:text-5xl leading-[0.98]" style={{ color: 'var(--color-ink)' }}>
+                {currentLocation} <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>through</em> the years.
+              </h2>
+              <p className="mt-3 text-sm text-slate-600 dark:text-slate-400" style={{ fontFamily: 'var(--font-display)' }}>
+                U.S. Census Bureau ACS 5-Year Estimates &middot; county level
               </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={exportData}
-                className="flex items-center space-x-2 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
-                title="Download as CSV"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">CSV</span>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportData}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-[0.65rem] uppercase tracking-[0.22em] font-mono border transition-colors"
+                      style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                <Download className="w-3 h-3" />
+                <span>CSV</span>
               </button>
-              <button
-                onClick={printReport}
-                className="flex items-center space-x-2 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
-                title="Print report"
-              >
-                <Printer className="w-4 h-4" />
-                <span className="hidden sm:inline">Print</span>
+              <button onClick={printReport}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-[0.65rem] uppercase tracking-[0.22em] font-mono border transition-colors"
+                      style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                <Printer className="w-3 h-3" />
+                <span>Print</span>
               </button>
-              <button
-                onClick={shareResults}
-                className="flex items-center space-x-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                title="Share result"
-              >
-                <Share2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Share</span>
+              <button onClick={shareResults}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+                      style={{ backgroundColor: 'var(--color-forest)', color: 'var(--color-wheat)' }}>
+                <Share2 className="w-3 h-3" />
+                <span>Share</span>
               </button>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Three metric charts */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Population */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-bold text-slate-700">Population</h4>
-              <Building2 className="w-4 h-4 text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
-              {trendsData[trendsData.length - 1].population.toLocaleString()}
-            </div>
-            <div className="text-xs text-slate-500 mb-4">
-              {deltaLabel(trendsData, 'population', v => Math.abs(v).toLocaleString())}
-            </div>
-            <MiniBarChart
-              data={trendsData}
-              valueKey="population"
-              color="bg-green-400"
-              formatVal={v => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v)}
-            />
+        {/* ── Three metric plates ──────────────────────────────────── */}
+        <section>
+          <div className="fg-rule mb-5">
+            <span>Exhibit A</span>
+            <span>Three indicators &middot; annual</span>
           </div>
 
-          {/* Median Income */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-bold text-slate-700">Median Household Income</h4>
-              <DollarSign className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
-              ${trendsData[trendsData.length - 1].medianIncome.toLocaleString()}
-            </div>
-            <div className="text-xs text-slate-500 mb-4">
-              {deltaLabel(trendsData, 'medianIncome', v => `$${Math.abs(v).toLocaleString()}`)}
-            </div>
-            <MiniBarChart
-              data={trendsData}
-              valueKey="medianIncome"
-              color="bg-blue-400"
-              formatVal={v => `$${(v / 1000).toFixed(0)}K`}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { key: 'population',       label: 'Population',              icon: Building2,  latest: trendsData[trendsData.length - 1].population.toLocaleString(),                                   delta: popDelta, color: '#4a7c59', valueKey: 'population', formatVal: v => v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v), positiveIsGood: true },
+              { key: 'income',           label: 'Median Household Income', icon: DollarSign, latest: `$${trendsData[trendsData.length - 1].medianIncome.toLocaleString()}`,                         delta: incDelta, color: '#1a5c2e', valueKey: 'medianIncome', formatVal: v => `$${(v/1000).toFixed(0)}K`,                       positiveIsGood: true },
+              { key: 'unemployment',     label: 'Unemployment Rate',       icon: Zap,        latest: `${trendsData[trendsData.length - 1].unemploymentRate}%`,                                     delta: uneDelta, color: '#b45309', valueKey: 'unemploymentRate', formatVal: v => `${v}%`,                                      positiveIsGood: false },
+            ].map(({ key, label, icon: Icon, latest, delta, color, valueKey, formatVal, positiveIsGood }) => {
+              const dcolor = metricColor(delta, positiveIsGood);
+              return (
+                <div key={key}
+                     className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] p-5"
+                     style={{ backgroundColor: 'var(--color-cream)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5" style={{ color: 'var(--color-ink-muted)' }} />
+                      <span className="text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                        {label}
+                      </span>
+                    </div>
+                    <span className="text-[0.6rem] uppercase tracking-wider font-mono" style={{ color: 'var(--color-ink-muted)', opacity: 0.7 }}>
+                      {lastYr}
+                    </span>
+                  </div>
+                  <div className="fg-numeral text-4xl mb-1" style={{ color: 'var(--color-ink)' }}>{latest}</div>
+                  {delta && (
+                    <div className="text-[0.65rem] uppercase tracking-[0.2em] font-mono mb-4 flex items-center gap-1.5" style={{ color: dcolor }}>
+                      <span aria-hidden>{delta.positive ? '\u2191' : '\u2193'}</span>
+                      <span>{delta.text}</span>
+                    </div>
+                  )}
+                  <MiniBarChart data={trendsData} valueKey={valueKey} color={color} formatVal={formatVal} />
+                </div>
+              );
+            })}
           </div>
+        </section>
 
-          {/* Unemployment */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-bold text-slate-700">Unemployment Rate</h4>
-              <Zap className="w-4 h-4 text-orange-500" />
-            </div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">
-              {trendsData[trendsData.length - 1].unemploymentRate}%
-            </div>
-            <div className="text-xs text-slate-500 mb-4">
-              {deltaLabel(trendsData, 'unemploymentRate', v => `${Math.abs(v).toFixed(1)}pp`)}
-            </div>
-            <MiniBarChart
-              data={trendsData}
-              valueKey="unemploymentRate"
-              color="bg-orange-400"
-              formatVal={v => `${v}%`}
-            />
+        {/* ── Annual data table ────────────────────────────────────── */}
+        <section>
+          <div className="fg-rule mb-5">
+            <span>Exhibit B</span>
+            <span>Annual Data Table</span>
           </div>
-        </div>
-
-        {/* Raw data table */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">Annual Data Table</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-2 pr-4 text-slate-600 dark:text-slate-400 font-semibold">Year</th>
-                  <th className="text-right py-2 px-4 text-slate-600 dark:text-slate-400 font-semibold">Population</th>
-                  <th className="text-right py-2 px-4 text-slate-600 dark:text-slate-400 font-semibold">Median Income</th>
-                  <th className="text-right py-2 pl-4 text-slate-600 dark:text-slate-400 font-semibold">Unemployment</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {trendsData.map(row => (
-                  <tr key={row.year} className="text-slate-700">
-                    <td className="py-2 pr-4 font-semibold">{row.year}</td>
-                    <td className="py-2 px-4 text-right">{row.population.toLocaleString()}</td>
-                    <td className="py-2 px-4 text-right">${row.medianIncome.toLocaleString()}</td>
-                    <td className="py-2 pl-4 text-right">{row.unemploymentRate}%</td>
+          <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]">
+                    {['Year', 'Population', 'Median Income', 'Unemployment'].map((h, i) => (
+                      <th key={h}
+                          className={`py-3 px-4 text-[0.65rem] uppercase tracking-[0.22em] font-mono font-normal ${i === 0 ? 'text-left' : 'text-right'}`}
+                          style={{ color: 'var(--color-ink-muted)' }}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {trendsData.map((row) => (
+                    <tr key={row.year} className="border-b border-dashed border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)] last:border-0">
+                      <td className="py-3 px-4 font-mono text-sm" style={{ color: 'var(--color-ink-muted)' }}>{row.year}</td>
+                      <td className="py-3 px-4 text-right fg-numeral text-lg" style={{ color: 'var(--color-ink)' }}>
+                        {row.population.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right fg-numeral text-lg" style={{ color: 'var(--color-ink)' }}>
+                        ${row.medianIncome.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right fg-numeral text-lg" style={{ color: 'var(--color-ink)' }}>
+                        {row.unemploymentRate}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-3">
-            Source: US Census Bureau American Community Survey 5-Year Estimates (ACS5), county level.
-            2020 figures use experimental estimates due to COVID-19 data collection disruptions.
+          <p className="mt-3 text-[0.65rem] uppercase tracking-[0.22em] font-mono leading-relaxed" style={{ color: 'var(--color-ink-muted)', opacity: 0.75 }}>
+            Source &mdash; U.S. Census Bureau American Community Survey 5-Year Estimates (ACS5) · County level · 2020 figures use experimental estimates due to COVID-19 data collection disruptions.
           </p>
-        </div>
+        </section>
       </div>
     );
   };
 
   // ── About View ─────────────────────────────────────────────────────────────
-  const AboutView = () => (
-    <div className="space-y-6">
-      {/* Hero */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
-        <div className="flex items-center space-x-4 mb-6">
-          <img
-            src={`${process.env.PUBLIC_URL}/logo.svg`}
-            alt="Rurality.app logo"
-            className="w-14 h-14 flex-shrink-0"
-          />
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">About Rurality.app</h2>
-            <p className="text-slate-500 text-sm mt-0.5">Rural classification · Real government data · Open access</p>
-          </div>
-        </div>
-        <p className="text-slate-700 leading-relaxed mb-4">
-          Rurality.app is a research tool for measuring and communicating the ruralness of any US location.
-          Every score is calculated from real, publicly available government datasets — no simulated or
-          estimated values. The app is designed to serve researchers, policymakers, journalists, and
-          anyone curious about rural America.
-        </p>
-        <p className="text-slate-700 leading-relaxed">
-          The tool was created to support work at the{' '}
-          <strong>Institute for Rural Initiatives at Arkansas State University</strong>, where ongoing
-          research examines how rurality shapes election administration, civic engagement, public health
-          access, and economic opportunity. The composite Rural Index draws on methods from the USDA
-          Economic Research Service, the US Census Bureau, and the peer-reviewed literature on rural
-          classification.
-        </p>
-      </div>
+  const AboutView = () => {
+    const dataSources = [
+      { n: '01', name: 'USDA ERS Rural-Urban Commuting Area Codes (RUCA)', vintage: '2020', scale: '41,146 ZCTAs',     detail: 'Primary ZIP-level classification', url: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/' },
+      { n: '02', name: 'USDA ERS Rural-Urban Continuum Codes (RUCC)',     vintage: '2023', scale: '3,233 counties',    detail: 'Nonmetro / metro continuum',       url: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/' },
+      { n: '03', name: 'US Census Bureau ACS 5-Year Estimates',           vintage: '2022', scale: 'County level',      detail: 'Population · income · unemployment · median age', url: 'https://www.census.gov/programs-surveys/acs' },
+      { n: '04', name: 'Census Geocoder API',                             vintage: 'live', scale: 'service',           detail: 'Coordinate → county FIPS + land area for density', url: 'https://geocoding.geo.census.gov/' },
+      { n: '05', name: 'OpenStreetMap / Nominatim',                       vintage: 'live', scale: 'service',           detail: 'Forward/reverse geocoding, rate-limited',          url: 'https://nominatim.openstreetmap.org/' },
+      { n: '06', name: 'FCC Census Area API',                             vintage: 'live', scale: 'fallback',          detail: 'County FIPS lookup when Census Geocoder is down',  url: 'https://geo.fcc.gov/api/census/' },
+    ];
 
-      {/* Author */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Users className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Author</h3>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-2xl">C</span>
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">Cameron Wimpy</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-              Associate Professor &amp; Department Chair, Government, Law &amp; Policy<br />
-              Director, Institute for Rural Initiatives<br />
-              Arkansas State University
-            </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Cameron's research focuses on election administration, political methodology, and rural
-              public policy. His current work examines how rurality affects outcomes in election
-              administration and the voter experience.
-            </p>
-            <div className="flex flex-wrap gap-3 mt-3">
-              <a
-                href="https://github.com/cwimpy/rurality-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1.5 text-sm text-green-700 hover:text-green-800 font-medium"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>GitHub Repository</span>
-              </a>
+    const limitations = [
+      'RUCA codes are from 2020 and RUCC codes from 2023, based on 2020 Census data. Rural character can change; scores may not reflect the most recent development.',
+      'Population density is calculated from 2022 ACS county totals divided by land area — it does not capture within-county variation.',
+      'The composite Rural Index is a research tool, not an official federal designation. It should complement, not replace, official classifications for regulatory or funding purposes.',
+      'RUCA is only available for ZIPs that appear in the USDA ZCTA file. Some ZIP codes (PO boxes, unique ZIPs) are not included.',
+      'Distance-to-metro scores use a fixed list of large, medium, and small metro areas. Commuting patterns in border regions may not be fully captured.',
+      'Broadband data is not yet incorporated in the live scoring; the weight redistributes to density and distance when broadband data is unavailable.',
+    ];
+
+    const Chapter = ({ num, kicker, title, children }) => (
+      <section className="relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          <div className="lg:col-span-3">
+            <div className="lg:sticky lg:top-24">
+              <div className="fg-numeral text-7xl sm:text-8xl leading-none" style={{ color: 'var(--color-wheat)' }}>{num}</div>
+              <div className="mt-2 text-[0.7rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>{kicker}</div>
+              <h3 className="fg-display text-3xl mt-2 leading-tight" style={{ color: 'var(--color-ink)' }}>{title}</h3>
             </div>
           </div>
+          <div className="lg:col-span-9 space-y-5">{children}</div>
         </div>
-      </div>
+      </section>
+    );
 
-      {/* Data sources */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Database className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Data Sources</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            {
-              name: 'USDA ERS Rural-Urban Commuting Area Codes (RUCA)',
-              detail: '2020 · ZIP/ZCTA level · 41,146 ZIP Code Tabulation Areas · Primary classification',
-              url: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/'
-            },
-            {
-              name: 'USDA ERS Rural-Urban Continuum Codes (RUCC)',
-              detail: '2023 · County level · 3,233 US counties · Nonmetro/metro continuum',
-              url: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/'
-            },
-            {
-              name: 'US Census Bureau ACS 5-Year Estimates',
-              detail: '2022 vintage · Population, income, unemployment, median age · County level',
-              url: 'https://www.census.gov/programs-surveys/acs'
-            },
-            {
-              name: 'Census Geocoder API',
-              detail: 'Coordinate → county FIPS + land area (AREALAND) · Used for density calculation',
-              url: 'https://geocoding.geo.census.gov/'
-            },
-            {
-              name: 'OpenStreetMap / Nominatim',
-              detail: 'Forward and reverse geocoding · Place name → lat/lng → ZIP code',
-              url: 'https://nominatim.openstreetmap.org/'
-            },
-            {
-              name: 'FCC Census Area API',
-              detail: 'Fallback county FIPS lookup when Census Geocoder is unavailable',
-              url: 'https://geo.fcc.gov/api/census/'
-            }
-          ].map(({ name, detail, url }) => (
-            <div key={name} className="bg-green-50 rounded-xl p-4 border border-green-100">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start space-x-2 group"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-green-600 mt-0.5 flex-shrink-0 group-hover:text-green-800" />
-                <div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-green-800">{name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{detail}</div>
+    return (
+      <div className="space-y-16 sm:space-y-20 pb-8">
+        {/* ── Editorial opening ─────────────────────────────────────── */}
+        <header className="topo-bg rounded-2xl border border-[rgba(26,58,42,0.14)] dark:border-[rgba(255,255,255,0.08)] px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-12"
+                style={{ backgroundColor: 'var(--color-parchment)' }}>
+          <div className="fg-rule mb-8">
+            <span>§ About</span>
+            <span className="hidden sm:inline">The Project &amp; the People</span>
+            <span>Est. 2026</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+            <div className="lg:col-span-8">
+              <div className="flex items-center gap-4 mb-5">
+                <img
+                  src={`${process.env.PUBLIC_URL}/logo.svg`}
+                  alt="Rurality.app logo"
+                  className="w-12 h-12 flex-shrink-0"
+                />
+                <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  Rurality.app &middot; Open access &middot; Real data
                 </div>
+              </div>
+              <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
+                A research tool for <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>rural</em> America.
+              </h2>
+              <p className="mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300"
+                 style={{ fontFamily: 'var(--font-display)' }}>
+                Rurality.app measures and communicates the ruralness of any U.S. location. Every score
+                is calculated from real, publicly available government datasets &mdash; no simulated
+                or estimated values. Built to serve researchers, policymakers, journalists, and anyone
+                curious about rural America.
+              </p>
+            </div>
+
+            <aside className="lg:col-span-4">
+              <div className="pl-5 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+                <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-3 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  The Workshop
+                </div>
+                <div className="fg-display text-lg leading-snug mb-2" style={{ color: 'var(--color-ink)' }}>
+                  Institute for Rural Initiatives
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Arkansas State University. Ongoing research on election administration, civic
+                  engagement, public health, and economic opportunity in rural contexts.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </header>
+
+        {/* ── §1 The Author ─────────────────────────────────────────── */}
+        <Chapter num="§1" kicker="The Author" title={<>Who built <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>this</em>.</>}>
+          <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] p-5 sm:p-6 flex flex-col sm:flex-row gap-5"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            {/* Monogram plate */}
+            <div className="flex-shrink-0">
+              <div className="w-20 h-20 rounded-lg flex items-center justify-center"
+                   style={{ backgroundColor: 'var(--color-forest)' }}>
+                <div className="relative">
+                  <span className="fg-display text-[3.25rem] leading-none" style={{ color: 'var(--color-wheat)', letterSpacing: '-0.12em' }}>
+                    CW
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 text-[0.6rem] uppercase tracking-[0.28em] font-mono text-center" style={{ color: 'var(--color-ink-muted)' }}>
+                Plate №&nbsp;01
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-1" style={{ color: 'var(--color-ink-muted)' }}>
+                Principal
+              </div>
+              <div className="fg-display text-2xl leading-tight" style={{ color: 'var(--color-ink)' }}>
+                Cameron Wimpy
+              </div>
+              <div className="mt-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed" style={{ fontFamily: 'var(--font-display)' }}>
+                Associate Professor &amp; Department Chair, Government, Law &amp; Policy<br />
+                Director, Institute for Rural Initiatives<br />
+                Arkansas State University
+              </div>
+              <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Cameron&rsquo;s research focuses on election administration, political methodology, and
+                rural public policy. His current work examines how rurality affects outcomes in
+                election administration and the voter experience.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a href="https://github.com/cwimpy/rurality-app" target="_blank" rel="noopener noreferrer"
+                   className="inline-flex items-center gap-1.5 text-[0.65rem] uppercase tracking-[0.24em] font-mono px-3 py-1.5 rounded border"
+                   style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                  <ExternalLink className="w-3 h-3" />
+                  <span>GitHub Repository</span>
+                </a>
+                <a href="https://github.com/cwimpy" target="_blank" rel="noopener noreferrer"
+                   className="inline-flex items-center gap-1.5 text-[0.65rem] uppercase tracking-[0.24em] font-mono px-3 py-1.5 rounded border"
+                   style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                  <ExternalLink className="w-3 h-3" />
+                  <span>More Projects</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </Chapter>
+
+        {/* ── §2 Background / motivation ────────────────────────────── */}
+        <Chapter num="§2" kicker="The Motivation" title={<>Why <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>build</em> this.</>}>
+          <p className="fg-display text-xl sm:text-2xl leading-snug italic max-w-3xl" style={{ color: 'var(--color-ink)' }}>
+            &ldquo;Rurality shapes election administration, civic engagement, public health access, and
+            economic opportunity &mdash; and yet most measures of it are categorical, outdated, or
+            designed for purposes far removed from the research at hand.&rdquo;
+          </p>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            The tool supports work at the{' '}
+            <strong style={{ color: 'var(--color-ink)' }}>Institute for Rural Initiatives at Arkansas State University</strong>,
+            where ongoing research examines how rurality interacts with the operations of American
+            democracy. The composite Rural Index draws on methods from the USDA Economic Research
+            Service, the U.S. Census Bureau, and the peer-reviewed literature on rural classification.
+          </p>
+        </Chapter>
+
+        {/* ── §3 Data sources ───────────────────────────────────────── */}
+        <Chapter num="§3" kicker="The Foundations" title={<>Data <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>sources</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Every value shown in the app traces back to one of these public sources. No survey
+            estimates are invented, no scores interpolated beyond what the underlying data support.
+          </p>
+          <ul className="divide-y divide-dashed divide-[rgba(26,58,42,0.18)] dark:divide-[rgba(255,255,255,0.1)] border-y border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
+            {dataSources.map(({ n, name, vintage, scale, detail, url }) => (
+              <li key={n} className="grid grid-cols-[auto_1fr_auto] gap-3 sm:gap-6 py-4 items-baseline">
+                <span className="fg-numeral text-2xl sm:text-3xl w-10" style={{ color: 'var(--color-wheat)' }}>{n}</span>
+                <div>
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                     className="fg-display text-lg leading-tight inline-flex items-baseline gap-1.5 hover:underline"
+                     style={{ color: 'var(--color-ink)' }}>
+                    {name} <ExternalLink className="w-3 h-3 self-center" />
+                  </a>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{detail}</div>
+                  <div className="mt-1 text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                    Vintage {vintage} &middot; {scale}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Chapter>
+
+        {/* ── §4 Limitations ────────────────────────────────────────── */}
+        <Chapter num="§4" kicker="The Fine Print" title={<>Limitations &amp; <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>caveats</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Every measurement tool has edges &mdash; places where it can tell you less than you&rsquo;d
+            like. These are ours.
+          </p>
+          <ol className="space-y-4">
+            {limitations.map((text, i) => (
+              <li key={i} className="grid grid-cols-[auto_1fr] gap-5 items-baseline">
+                <span className="fg-numeral text-2xl w-10" style={{ color: 'var(--color-wheat)' }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <p className="text-sm sm:text-[0.95rem] leading-relaxed text-slate-700 dark:text-slate-300"
+                   style={{ fontFamily: 'var(--font-display)' }}>
+                  {text}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </Chapter>
+
+        {/* ── Colophon ──────────────────────────────────────────────── */}
+        <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
+          <div className="fg-rule mb-6">
+            <span>Colophon</span>
+            <span>Made with care &amp; R</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8">
+              <p className="fg-display text-xl sm:text-2xl leading-snug italic max-w-2xl" style={{ color: 'var(--color-ink)' }}>
+                Set in Source Serif 4, DM Sans, and JetBrains Mono. Built with React, Tailwind, and
+                Leaflet. Deployed on Netlify. Source on GitHub.
+              </p>
+            </div>
+            <div className="lg:col-span-4 flex flex-col gap-3">
+              <a href="https://github.com/cwimpy/rurality-app"
+                 target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-between px-4 py-3 rounded-md text-sm uppercase tracking-wider font-mono"
+                 style={{ backgroundColor: 'var(--color-forest)', color: '#fff' }}>
+                <span>View Source</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              <a href="https://github.com/cwimpy/rurality-app/issues"
+                 target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-between px-4 py-3 rounded-md text-sm uppercase tracking-wider font-mono border"
+                 style={{ borderColor: 'var(--color-forest)', color: 'var(--color-ink)' }}>
+                <span>Open an Issue</span>
+                <ExternalLink className="w-4 h-4" />
               </a>
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
       </div>
-
-      {/* Open source / limitations */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Scale className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Limitations &amp; Caveats</h3>
-        </div>
-        <ul className="space-y-2 text-sm text-slate-700">
-          {[
-            'RUCA codes are from 2020 and RUCC codes from 2023, based on 2020 Census data. Rural character can change; scores may not reflect the most recent development.',
-            'Population density is calculated from 2022 ACS county totals divided by land area — it does not capture within-county variation.',
-            'The composite Rural Index is a research tool, not an official federal designation. It should complement, not replace, official classifications for regulatory or funding purposes.',
-            'RUCA is only available for ZIPs that appear in the USDA ZCTA file. Some ZIP codes (PO boxes, unique ZIPs) are not included.',
-            'Distance-to-metro scores use a fixed list of large, medium, and small metro areas. Commuting patterns in border regions may not be fully captured.',
-            'Broadband data is not yet incorporated in the live scoring; the weight redistributes to density and distance when broadband data is unavailable.'
-          ].map((text, i) => (
-            <li key={i} className="flex items-start space-x-2">
-              <span className="text-green-500 font-bold flex-shrink-0 mt-0.5">·</span>
-              <span>{text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // ── Methodology View ────────────────────────────────────────────────────────
-  const MethodologyView = () => (
-    <div className="space-y-6">
-      {/* Overview */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
-        <div className="flex items-center space-x-3 mb-4">
-          <FlaskConical className="w-6 h-6 text-green-600" />
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Methodology</h2>
-        </div>
-        <p className="text-slate-700 leading-relaxed mb-4">
-          The <strong>Rurality Index (RRI)</strong> is a composite 0–100 score where higher values
-          indicate greater rurality. It combines up to four components drawn from authoritative federal
-          datasets. Weights adapt based on data availability, with RUCA serving as the anchor when
-          a ZIP code can be matched to the USDA dataset.
-        </p>
-        <div className="bg-green-50 rounded-xl p-4 border border-green-100 text-sm text-slate-600 dark:text-slate-300">
-          <strong className="text-slate-800 dark:text-slate-100">Interpretation:</strong> A score of 0 represents maximum
-          urban density; 100 represents maximum remoteness. Classifications are:
-          Very Rural (≥80) · Rural (≥60) · Mixed (≥40) · Suburban (≥20) · Urban (&lt;20).
-        </div>
-      </div>
+  const MethodologyView = () => {
+    // Helper: color a RUCA score along the urban → rural ramp
+    const scoreColor = (s) => {
+      if (s < 20) return '#991b1b';
+      if (s < 40) return '#b45309';
+      if (s < 60) return '#a17321';
+      if (s < 80) return '#4a7c59';
+      return '#1a5c2e';
+    };
+    const ombColor = (t) =>
+      t === 'Metro'    ? '#991b1b' :
+      t === 'Micro'    ? '#b45309' :
+                         '#4a7c59';
 
-      {/* Weights */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Calculator className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Component Weights</h3>
+    const weightScenarios = [
+      { label: 'RUCA + Broadband',   confidence: 'High',        parts: [['RUCA', 50, '#1a3a2a'], ['Density', 25, '#4a7c59'], ['Distance', 15, '#a17321'], ['Broadband', 10, '#d4a843']] },
+      { label: 'RUCA only',          confidence: 'Medium-high', parts: [['RUCA', 55, '#1a3a2a'], ['Density', 25, '#4a7c59'], ['Distance', 20, '#a17321']] },
+      { label: 'Broadband, no RUCA', confidence: 'Medium',      parts: [['Density', 50, '#4a7c59'], ['Distance', 25, '#a17321'], ['Broadband', 25, '#d4a843']] },
+      { label: 'Density + Distance', confidence: 'Medium',      parts: [['Density', 55, '#4a7c59'], ['Distance', 45, '#a17321']] },
+    ];
+
+    const rucaCodes = [
+      [1,'Metropolitan area core',8],
+      [2,'Metropolitan — high commuting',15],
+      [3,'Metropolitan — low commuting',24],
+      [4,'Micropolitan (small city) core',38],
+      [5,'Micropolitan — high commuting',48],
+      [6,'Micropolitan — low commuting',56],
+      [7,'Small town core',68],
+      [8,'Small town — high commuting',76],
+      [9,'Small town — low commuting',84],
+      [10,'Rural — no significant urban commuting',95],
+    ];
+
+    const ruccCodes = [
+      [1,'Metro ≥1M population','Metro'],
+      [2,'Metro 250K–1M','Metro'],
+      [3,'Metro <250K','Metro'],
+      [4,'Nonmetro urban 20K+, adjacent','Micro'],
+      [5,'Nonmetro urban 20K+, not adjacent','Micro'],
+      [6,'Nonmetro urban 2.5–20K, adjacent','Nonmetro'],
+      [7,'Nonmetro urban 2.5–20K, not adj.','Nonmetro'],
+      [8,'Completely rural, adjacent','Nonmetro'],
+      [9,'Completely rural, not adjacent','Nonmetro'],
+    ];
+
+    const densitySamples = [
+      ['1/sq mi','≈ 100'], ['100/sq mi','≈ 70'], ['1,000/sq mi','≈ 45'],
+      ['10,000/sq mi','≈ 20'], ['27,000/sq mi','0'],
+    ];
+
+    const refs = [
+      { n: '01', citation: 'USDA Economic Research Service. (2023). Rural-Urban Continuum Codes.', url: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/' },
+      { n: '02', citation: 'USDA Economic Research Service. (2020). Rural-Urban Commuting Area Codes.', url: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/' },
+      { n: '03', citation: 'Cromartie, J., & Bucholtz, S. (2008). Defining the “rural” in rural America. Amber Waves, 6(3), 28–34. USDA ERS.', url: null },
+      { n: '04', citation: 'Hart, L. G., Larson, E. H., & Lishner, D. M. (2005). Rural definitions for health policy and research. American Journal of Public Health, 95(7), 1149–1155.', url: null },
+      { n: '05', citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan, micropolitan, and combined statistical areas.', url: null },
+    ];
+
+    const Chapter = ({ num, kicker, title, children }) => (
+      <section className="relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          <div className="lg:col-span-3">
+            <div className="lg:sticky lg:top-24">
+              <div className="fg-numeral text-7xl sm:text-8xl leading-none" style={{ color: 'var(--color-wheat)' }}>
+                {num}
+              </div>
+              <div className="mt-2 text-[0.7rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                {kicker}
+              </div>
+              <h3 className="fg-display text-3xl mt-2 leading-tight" style={{ color: 'var(--color-ink)' }}>
+                {title}
+              </h3>
+            </div>
+          </div>
+          <div className="lg:col-span-9 space-y-5">{children}</div>
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          Weights shift depending on which data are available for a given location.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="text-left py-2 pr-4 text-slate-700 font-semibold">Scenario</th>
-                <th className="text-center py-2 px-3 text-slate-700 font-semibold">RUCA</th>
-                <th className="text-center py-2 px-3 text-slate-700 font-semibold">Pop. Density</th>
-                <th className="text-center py-2 px-3 text-slate-700 font-semibold">Distance</th>
-                <th className="text-center py-2 px-3 text-slate-700 font-semibold">Broadband</th>
-                <th className="text-center py-2 px-3 text-slate-700 font-semibold">Confidence</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[
-                ['RUCA + Broadband available', '50%', '25%', '15%', '10%', 'High'],
-                ['RUCA only',                  '55%', '25%', '20%',  '—',  'Medium-high'],
-                ['No RUCA, broadband available','—',   '50%', '25%', '25%', 'Medium'],
-                ['Density + Distance only',     '—',   '55%', '30%',  '—',  'Medium'],
-              ].map(([scenario, ...cols]) => (
-                <tr key={scenario} className="text-slate-700">
-                  <td className="py-2 pr-4 font-medium">{scenario}</td>
-                  {cols.map((v, i) => (
-                    <td key={i} className={`text-center py-2 px-3 ${v === '—' ? 'text-slate-300' : ''}`}>{v}</td>
+      </section>
+    );
+
+    return (
+      <div className="space-y-16 sm:space-y-20 pb-8">
+        {/* ── Editorial opening ─────────────────────────────────────── */}
+        <header className="topo-bg rounded-2xl border border-[rgba(26,58,42,0.14)] dark:border-[rgba(255,255,255,0.08)] px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-12"
+                style={{ backgroundColor: 'var(--color-parchment)' }}>
+          <div className="fg-rule mb-8">
+            <span>§ The Rurality Index</span>
+            <span className="hidden sm:inline">A Working Methodology</span>
+            <span>v. 2026</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8">
+              <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
+                How the <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>index</em> is built.
+              </h2>
+              <p className="mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300"
+                 style={{ fontFamily: 'var(--font-display)' }}>
+                The <strong>Rurality Index</strong> (RRI) is a continuous 0–100 score in which higher
+                values indicate greater rurality. It draws on up to four components from authoritative
+                federal datasets. Weights adapt to data availability, with the USDA&rsquo;s RUCA
+                classification anchoring the score whenever a ZIP code can be matched.
+              </p>
+            </div>
+
+            <aside className="lg:col-span-4">
+              <div className="pl-5 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+                <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-3 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  Reading the Score
+                </div>
+                {[
+                  ['80–100', 'Very Rural', '#1a5c2e'],
+                  ['60–79',  'Rural',      '#4a7c59'],
+                  ['40–59',  'Mixed',      '#a17321'],
+                  ['20–39',  'Suburban',   '#b45309'],
+                  ['0–19',   'Urban',      '#991b1b'],
+                ].map(([range, label, c], i, arr) => (
+                  <div key={label}
+                       className={`flex items-center justify-between py-2 ${i !== arr.length - 1 ? 'border-b border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]' : ''}`}>
+                    <span className="flex items-center gap-3">
+                      <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: c }} />
+                      <span className="font-mono text-xs tracking-wider" style={{ color: 'var(--color-ink)' }}>{range}</span>
+                    </span>
+                    <span className="text-sm uppercase tracking-wider" style={{ color: c, fontWeight: 600 }}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </header>
+
+        {/* ── §1 Weights ────────────────────────────────────────────── */}
+        <Chapter num="§1" kicker="The Weighting Scheme" title={<>How the pieces <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>combine</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Not every location has every input. When a ZIP can be matched to USDA RUCA, we lean on it.
+            When it can&rsquo;t &mdash; say, for a county-level query &mdash; weight shifts to density and
+            distance. The confidence label summarizes how strong the weighting is for that scenario.
+          </p>
+
+          <div className="space-y-5 mt-2">
+            {weightScenarios.map(({ label, confidence, parts }) => (
+              <div key={label}>
+                <div className="flex items-baseline justify-between mb-2">
+                  <div className="flex items-baseline gap-3">
+                    <span className="fg-display text-xl" style={{ color: 'var(--color-ink)' }}>{label}</span>
+                    <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                      {confidence}
+                    </span>
+                  </div>
+                </div>
+                {/* stacked bar */}
+                <div className="flex h-9 rounded-md overflow-hidden border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]">
+                  {parts.map(([name, pct, color]) => (
+                    <div key={name}
+                         className="flex items-center justify-center text-[0.65rem] uppercase tracking-wider text-white font-mono"
+                         style={{ width: `${pct}%`, backgroundColor: color, minWidth: 0 }}
+                         title={`${name} ${pct}%`}>
+                      <span className="truncate px-2">{pct >= 18 ? `${name} ${pct}%` : `${pct}%`}</span>
+                    </div>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Components */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* RUCA */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">1. RUCA Code (ZIP level)</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            The USDA Rural-Urban Commuting Area (RUCA) code is the gold standard for ZIP-level
-            rural classification. It uses Census commuting flow data to categorize ZIP Code
-            Tabulation Areas (ZCTAs) by their integration with urban cores.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Code</th>
-                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Description</th>
-                  <th className="text-center py-1 text-slate-600 dark:text-slate-300">Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {[
-                  [1,'Metropolitan area core',8],
-                  [2,'Metropolitan — high commuting',15],
-                  [3,'Metropolitan — low commuting',24],
-                  [4,'Micropolitan (small city) core',38],
-                  [5,'Micropolitan — high commuting',48],
-                  [6,'Micropolitan — low commuting',56],
-                  [7,'Small town core',68],
-                  [8,'Small town — high commuting',76],
-                  [9,'Small town — low commuting',84],
-                  [10,'Rural — no significant urban commuting',95],
-                ].map(([code, desc, score]) => (
-                  <tr key={code} className="text-slate-600 dark:text-slate-300">
-                    <td className="py-1 pr-2 font-mono font-semibold">{code}</td>
-                    <td className="py-1 pr-2">{desc}</td>
-                    <td className="py-1 text-center text-green-700 font-semibold">{score}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* RUCC */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">2. RUCC Code (County level)</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            The USDA Rural-Urban Continuum Code (RUCC) classifies US counties on a 1–9 scale.
-            It is the basis for the OMB Metropolitan/Micropolitan/Nonmetro designation shown in
-            the classifications panel. RUCC is displayed for reference and OMB derivation; it
-            does not enter the composite score directly.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Code</th>
-                  <th className="text-left py-1 pr-2 text-slate-600 dark:text-slate-300">Description</th>
-                  <th className="text-center py-1 text-slate-600 dark:text-slate-300">OMB</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {[
-                  [1,'Metro ≥1M population','Metro'],
-                  [2,'Metro 250K–1M','Metro'],
-                  [3,'Metro &lt;250K','Metro'],
-                  [4,'Nonmetro urban 20K+, adjacent','Micro'],
-                  [5,'Nonmetro urban 20K+, not adjacent','Micro'],
-                  [6,'Nonmetro urban 2.5–20K, adjacent','Nonmetro'],
-                  [7,'Nonmetro urban 2.5–20K, not adj.','Nonmetro'],
-                  [8,'Completely rural, adjacent','Nonmetro'],
-                  [9,'Completely rural, not adjacent','Nonmetro'],
-                ].map(([code, desc, omb]) => (
-                  <tr key={code} className="text-slate-600 dark:text-slate-300">
-                    <td className="py-1 pr-2 font-mono font-semibold">{code}</td>
-                    <td className="py-1 pr-2" dangerouslySetInnerHTML={{ __html: desc }} />
-                    <td className={`py-1 text-center text-xs font-semibold ${
-                      omb === 'Metro' ? 'text-red-600' : omb === 'Micro' ? 'text-yellow-600' : 'text-green-700'
-                    }`}>{omb}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Population density */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">3. Population Density</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            County population (ACS 2022) divided by land area in square miles (Census TIGER via
-            Census Geocoder). The score is log-transformed so that extremely dense urban cores
-            don't compress variation across rural and suburban areas.
-          </p>
-          <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-300">
-            score = 100 − log₁₀(density) × 25<br />
-            <span className="text-slate-400">clamped to [0, 100]</span>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center text-slate-600 dark:text-slate-300">
-            {[['1/sq mi','≈100'],['100/sq mi','≈70'],['1,000/sq mi','≈45'],['10,000/sq mi','≈20'],['27,000/sq mi','0']].map(([d,s])=>(
-              <div key={d} className="bg-green-50 rounded p-2 border border-green-100">
-                <div className="font-semibold text-slate-700">{s}</div>
-                <div className="text-slate-500 dark:text-slate-400">{d}</div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        </Chapter>
 
-        {/* Distance */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">4. Distance to Metro</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            Haversine distance from the queried coordinates to the nearest metro area in each of
-            three size tiers (large ≥1M, medium 250K–1M, small 50K–250K). The three distances
-            are combined into a single score with differential weights.
+        {/* ── §2 Components — RUCA ──────────────────────────────────── */}
+        <Chapter num="01" kicker="Component · ZIP-level" title={<>RUCA &mdash; <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>the anchor</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            The USDA Rural-Urban Commuting Area code is the gold standard for ZIP-level rural
+            classification. It uses Census commuting-flow data to categorize ZIP Code Tabulation Areas
+            by their integration with urban cores on a 1&ndash;10 scale.
           </p>
-          <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-300 space-y-1">
-            <div>large  = min(100, distance_mi / 2) &nbsp;&nbsp;× 0.50</div>
-            <div>medium = min(100, distance_mi / 1.5) × 0.30</div>
-            <div>small  = min(100, distance_mi) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;× 0.20</div>
-            <div className="text-slate-400">score = sum of above, clamped to [0, 100]</div>
+
+          <div className="mt-2 rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="px-4 py-2 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.28em] font-mono border-b border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+                 style={{ color: 'var(--color-ink-muted)' }}>
+              <span>Exhibit A · RUCA scoring</span>
+              <span>Score out of 100</span>
+            </div>
+            <ul className="divide-y divide-dashed divide-[rgba(26,58,42,0.12)] dark:divide-[rgba(255,255,255,0.08)]">
+              {rucaCodes.map(([code, desc, score]) => (
+                <li key={code} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs font-semibold"
+                        style={{ backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+                    {code}
+                  </span>
+                  <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{desc}</span>
+                  <div className="flex items-center gap-3 min-w-[160px]">
+                    <div className="flex-1 h-1.5 rounded-full" style={{ backgroundColor: 'var(--color-rule-soft)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${score}%`, backgroundColor: scoreColor(score) }} />
+                    </div>
+                    <span className="fg-numeral text-xl w-8 text-right" style={{ color: scoreColor(score) }}>{score}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Large-metro distance dominates (50%) because proximity to a major city is the strongest
-            single determinant of rural isolation in the literature.
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            Source: USDA ERS RUCA 2020 · 41,146 ZCTAs · updated decennially with Census commuting data.
           </p>
-        </div>
-      </div>
+        </Chapter>
 
-      {/* References */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <BookOpen className="w-5 h-5 text-green-600" />
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Key References</h3>
-        </div>
-        <ul className="space-y-3 text-sm text-slate-700">
-          {[
-            {
-              citation: 'USDA Economic Research Service. (2023). Rural-Urban Continuum Codes.',
-              url: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/'
-            },
-            {
-              citation: 'USDA Economic Research Service. (2020). Rural-Urban Commuting Area Codes.',
-              url: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/'
-            },
-            {
-              citation: 'Cromartie, J., & Bucholtz, S. (2008). Defining the "rural" in rural America. Amber Waves, 6(3), 28–34. USDA ERS.',
-              url: null
-            },
-            {
-              citation: 'Hart, L. G., Larson, E. H., & Lishner, D. M. (2005). Rural definitions for health policy and research. American Journal of Public Health, 95(7), 1149–1155.',
-              url: null
-            },
-            {
-              citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan statistical areas, micropolitan statistical areas, and combined statistical areas.',
-              url: null
-            },
-          ].map(({ citation, url }) => (
-            <li key={citation} className="flex items-start space-x-2">
-              <span className="text-green-500 font-bold flex-shrink-0 mt-0.5">·</span>
-              <span>
-                {citation}
-                {url && (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 inline-flex items-center space-x-0.5 text-green-700 hover:text-green-900"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {/* ── §3 Components — RUCC ──────────────────────────────────── */}
+        <Chapter num="02" kicker="Component · County-level" title={<>RUCC &amp; the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>OMB</em> designation.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            The USDA Rural-Urban Continuum Code classifies U.S. counties on a 1&ndash;9 scale and is
+            the basis for the OMB Metropolitan / Micropolitan / Nonmetro designation shown in the
+            classifications panel. RUCC is displayed for reference and OMB derivation; it does not
+            enter the composite score directly.
+          </p>
+
+          <div className="mt-2 rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="px-4 py-2 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.28em] font-mono border-b border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+                 style={{ color: 'var(--color-ink-muted)' }}>
+              <span>Exhibit B · RUCC → OMB</span>
+              <span>9 tiers</span>
+            </div>
+            <ul className="divide-y divide-dashed divide-[rgba(26,58,42,0.12)] dark:divide-[rgba(255,255,255,0.08)]">
+              {ruccCodes.map(([code, desc, omb]) => (
+                <li key={code} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center font-mono text-xs font-semibold"
+                        style={{ backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+                    {code}
+                  </span>
+                  <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{desc}</span>
+                  <span className="text-[0.65rem] uppercase tracking-[0.2em] font-mono px-2 py-1 rounded"
+                        style={{ color: ombColor(omb), backgroundColor: `${ombColor(omb)}1a` }}>
+                    {omb}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            Source: USDA ERS RUCC 2023 · 3,235 U.S. counties · updated on each decennial revision.
+          </p>
+        </Chapter>
+
+        {/* ── §4 Components — Density ───────────────────────────────── */}
+        <Chapter num="03" kicker="Component · Log-transformed" title={<>Population <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>density</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            County population (ACS 2022) divided by land area in square miles (Census TIGER via Census
+            Geocoder). The score is log-transformed so extremely dense urban cores don&rsquo;t compress
+            variation across rural and suburban areas.
+          </p>
+
+          <div className="rounded-lg overflow-hidden border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]"
+               style={{ backgroundColor: 'var(--color-forest)' }}>
+            <div className="px-4 py-2 text-[0.65rem] uppercase tracking-[0.28em] font-mono text-white/60 border-b border-white/10">
+              The Formula
+            </div>
+            <div className="px-4 py-5 font-mono text-sm sm:text-base text-white">
+              <span style={{ color: 'var(--color-wheat)' }}>score</span> = 100 &minus; log<sub>10</sub>(<em>density</em>) × 25
+              <div className="text-xs text-white/50 mt-1">clamped to [0, 100]</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-2 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+              Reference Points
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {densitySamples.map(([d, s]) => {
+                const val = parseInt(s.replace(/[^0-9]/g, '') || '0', 10);
+                return (
+                  <div key={d} className="rounded border border-dashed p-3 text-center border-[rgba(26,58,42,0.2)] dark:border-[rgba(255,255,255,0.12)]"
+                       style={{ backgroundColor: 'var(--color-cream)' }}>
+                    <div className="fg-numeral text-2xl" style={{ color: scoreColor(val) }}>{s}</div>
+                    <div className="text-[0.65rem] uppercase tracking-wider mt-1 text-slate-500 dark:text-slate-400">{d}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Chapter>
+
+        {/* ── §5 Components — Distance ──────────────────────────────── */}
+        <Chapter num="04" kicker="Component · Three-tier" title={<>Distance to <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>metro</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Haversine distance from the queried coordinates to the nearest metro area in each of three
+            size tiers. The three distances are combined into a single score with differential weights.
+            Large-metro distance dominates because proximity to a major city is the strongest single
+            determinant of rural isolation in the literature.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              { tier: 'Large',  size: '≥ 1M pop.',       weight: 0.50, divisor: 2,   color: '#1a3a2a' },
+              { tier: 'Medium', size: '250K–1M',         weight: 0.30, divisor: 1.5, color: '#4a7c59' },
+              { tier: 'Small',  size: '50K–250K',        weight: 0.20, divisor: 1,   color: '#a17321' },
+            ].map(({ tier, size, weight, divisor, color }) => (
+              <div key={tier} className="flex items-center gap-4 rounded-lg px-4 py-3 border border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+                   style={{ backgroundColor: 'var(--color-cream)' }}>
+                <div className="w-3 h-12 rounded-sm" style={{ backgroundColor: color }} />
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-3">
+                    <span className="fg-display text-lg" style={{ color: 'var(--color-ink)' }}>{tier}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 italic">{size}</span>
+                  </div>
+                  <div className="font-mono text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    min(100, dist<sub>mi</sub> / {divisor}) &nbsp;×&nbsp;
+                    <span style={{ color }}>{weight.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="fg-numeral text-3xl" style={{ color }}>{`${Math.round(weight * 100)}%`}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            Summed across tiers and clamped to [0, 100]. Coordinates resolved via Census Geocoder or Nominatim.
+          </p>
+        </Chapter>
+
+        {/* ── References ────────────────────────────────────────────── */}
+        <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
+          <div className="fg-rule mb-6">
+            <span>End-matter</span>
+            <span>Key References</span>
+          </div>
+          <ol className="space-y-5 max-w-4xl">
+            {refs.map(({ n, citation, url }) => (
+              <li key={n} className="grid grid-cols-[auto_1fr] gap-4 sm:gap-6 items-baseline">
+                <span className="fg-numeral text-2xl sm:text-3xl" style={{ color: 'var(--color-wheat)' }}>{n}</span>
+                <p className="text-sm sm:text-[0.95rem] leading-relaxed text-slate-700 dark:text-slate-300"
+                   style={{ fontFamily: 'var(--font-display)' }}>
+                  {citation}
+                  {url && (
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                       className="ml-1.5 inline-flex items-center gap-0.5 text-xs uppercase tracking-wider font-mono no-underline hover:underline"
+                       style={{ color: 'var(--color-ink-muted)' }}>
+                      <ExternalLink className="w-3 h-3" /> link
+                    </a>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── For Researchers View ────────────────────────────────────────────────────
   const ForResearchersView = () => {
@@ -1293,86 +1898,17 @@ const RuralityApp = () => {
       );
     };
 
-    return (
-      <div className="space-y-6">
+    const uses = [
+      { title: 'Survey research',         desc: 'Classify respondents by rurality using their ZIP code. Merge RUCA codes onto survey microdata for subgroup analysis.' },
+      { title: 'Election administration', desc: 'Identify rural jurisdictions for comparative analysis of polling place access, wait times, and mail ballot use.' },
+      { title: 'Public health',           desc: 'Stratify health outcomes by RUCC or composite RRI. Examine rural–urban gradients in access, mortality, or utilization.' },
+      { title: 'Policy evaluation',       desc: 'Define treatment and control groups using OMB metro/nonmetro or RUCA thresholds. Consistent with USDA program eligibility rules.' },
+      { title: 'Education research',      desc: 'Classify school districts or counties by rurality. Link to NCES locale codes for cross-framework comparison.' },
+      { title: 'Grant proposals',         desc: 'Document the rurality of your study area with official USDA and OMB classifications to satisfy NSF, NIH, and USDA program requirements.' },
+    ];
 
-        {/* Hero */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-8">
-          <div className="flex items-center space-x-3 mb-3">
-            <BookOpen className="w-6 h-6 text-green-600" />
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">For Researchers</h2>
-          </div>
-          <p className="text-slate-600 leading-relaxed max-w-3xl">
-            Rurality.app is built on publicly available federal datasets and a transparent
-            composite methodology. This page provides everything you need to cite the tool,
-            replicate the scores in R, and access the underlying data directly for your
-            own analysis.
-          </p>
-        </div>
-
-        {/* Citation */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Scale className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">How to Cite</h3>
-          </div>
-          <p className="text-sm text-slate-500 mb-3">APA 7th edition</p>
-          <div className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
-            <p className="flex-1 text-sm text-slate-700 font-mono leading-relaxed">{citation}</p>
-            <button
-              onClick={copyCitation}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
-            >
-              {citationCopied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-          <p className="text-xs text-slate-400 mt-3">
-            If you use the composite Rural Index methodology in published work, please also cite
-            the underlying USDA ERS data sources listed below.
-          </p>
-        </div>
-
-        {/* Suggested uses */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Users className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Suggested Uses</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { title: 'Survey research', desc: 'Classify respondents by rurality using their ZIP code. Merge RUCA codes onto survey microdata for subgroup analysis.' },
-              { title: 'Election administration', desc: 'Identify rural jurisdictions for comparative analysis of polling place access, wait times, and mail ballot use.' },
-              { title: 'Public health', desc: 'Stratify health outcomes by RUCC or composite RRI. Examine rural–urban gradients in access, mortality, or utilization.' },
-              { title: 'Policy evaluation', desc: 'Define treatment and control groups using OMB metro/nonmetro or RUCA thresholds. Consistent with USDA program eligibility rules.' },
-              { title: 'Education research', desc: 'Classify school districts or counties by rurality. Link to NCES locale codes for cross-framework comparison.' },
-              { title: 'Grant proposals', desc: 'Document the rurality of your study area with official USDA and OMB classifications to satisfy NSF, NIH, and USDA program requirements.' },
-            ].map(({ title, desc }) => (
-              <div key={title} className="flex items-start space-x-3 p-4 bg-green-50 rounded-xl border border-green-100">
-                <span className="text-green-500 font-bold flex-shrink-0 mt-0.5">·</span>
-                <div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
-                  <div className="text-xs text-slate-600 mt-0.5 leading-relaxed">{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* R replication */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-2">
-            <Calculator className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Replicating the Score in R</h3>
-          </div>
-          <p className="text-sm text-slate-500 mb-5">
-            The composite Rural Index can be replicated entirely in R using the same USDA and
-            Census data this app uses. The snippets below walk through each step.
-          </p>
-
-          <div className="space-y-5">
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">1 — Load USDA RUCA and RUCC data</p>
-              <CodeBlock code={`
+    const steps = [
+      { n: '01', title: 'Load USDA RUCA & RUCC', code: `
 library(tidyverse)
 library(readxl)
 
@@ -1393,12 +1929,8 @@ rucc <- read_csv("rucc2023.csv") |>
     county    = str_sub(fips, 3, 5)
   ) |>
   filter(!is.na(rucc_code), between(rucc_code, 1L, 9L))
-              `} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">2 — Define classification helpers</p>
-              <CodeBlock code={`
+` },
+      { n: '02', title: 'Define classification helpers', code: `
 # RUCA → rurality score (0–100)
 ruca_to_score <- function(code) {
   map <- c("1"=8,"2"=15,"3"=24,"4"=38,"5"=48,
@@ -1424,12 +1956,8 @@ omb_designation <- function(rucc) {
 # Rural flag (RUCA >= 4 or RUCC >= 4)
 is_rural_ruca <- function(code) code >= 4
 is_rural_rucc <- function(code) code >= 4
-              `} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">3 — Merge onto your county-level data</p>
-              <CodeBlock code={`
+` },
+      { n: '03', title: 'Merge onto your county-level data', code: `
 # Assumes your data has a 5-digit county FIPS column called "fips"
 # and population + land area columns to compute density
 
@@ -1441,12 +1969,8 @@ your_data <- your_data |>
     omb           = omb_designation(rucc_code),
     rural_rucc    = is_rural_rucc(rucc_code)
   )
-              `} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">4 — Merge RUCA onto ZIP-level data</p>
-              <CodeBlock code={`
+` },
+      { n: '04', title: 'Merge RUCA onto ZIP-level data', code: `
 # Assumes your data has a 5-digit ZIP or ZCTA column called "zip"
 
 your_zip_data <- your_zip_data |>
@@ -1456,12 +1980,8 @@ your_zip_data <- your_zip_data |>
     ruca_score = ruca_to_score(ruca_code),
     rural_ruca = is_rural_ruca(ruca_code)
   )
-              `} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">5 — Compute composite Rural Index (RUCA + density only)</p>
-              <CodeBlock code={`
+` },
+      { n: '05', title: 'Compute composite Rural Index', code: `
 # Weights when RUCA is available but broadband data is not:
 #   RUCA 55%, Population density 25%, Distance to metro 20%
 # This simplified version uses RUCA + density (omits distance to metro).
@@ -1483,112 +2003,274 @@ your_data <- your_data |>
       TRUE      ~ "Urban"
     )
   )
-              `} />
+` },
+    ];
+
+    const sources = [
+      { n: '01', name: 'USDA ERS Rural-Urban Commuting Area Codes (RUCA)', vintage: '2020', size: '41,146 ZCTAs',
+        desc: 'ZIP/ZCTA level · Primary RUCA code 1–10',
+        page: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/',
+        file: 'https://www.ers.usda.gov/media/5442/2020-rural-urban-commuting-area-codes-zip-codes.xlsx',
+        fileLabel: 'XLSX' },
+      { n: '02', name: 'USDA ERS Rural-Urban Continuum Codes (RUCC)', vintage: '2023', size: '3,233 counties',
+        desc: 'County level · RUCC code 1–9',
+        page: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/',
+        file: 'https://www.ers.usda.gov/media/5767/2023-rural-urban-continuum-codes.xlsx',
+        fileLabel: 'XLSX' },
+      { n: '03', name: 'US Census Bureau ACS 5-Year Estimates', vintage: '2018–2022', size: 'County level',
+        desc: 'Population, income, unemployment',
+        page: 'https://www.census.gov/programs-surveys/acs',
+        file: 'https://api.census.gov/data/2022/acs/acs5/variables.html',
+        fileLabel: 'Variables' },
+      { n: '04', name: 'US Census Bureau Geocoder API', vintage: 'live', size: 'service',
+        desc: 'Coordinate → county FIPS + land area (density calc)',
+        page: 'https://geocoding.geo.census.gov/geocoder/',
+        file: null, fileLabel: null },
+    ];
+
+    const MetaKV = ({ k, v, sep = false }) => (
+      <div className={`flex items-baseline gap-3 ${sep ? 'border-t border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] pt-2 mt-2' : ''}`}>
+        <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono flex-shrink-0 w-24" style={{ color: 'var(--color-ink-muted)' }}>{k}</span>
+        <span className="text-sm text-slate-700 dark:text-slate-300">{v}</span>
+      </div>
+    );
+
+    const Chapter = ({ num, kicker, title, children }) => (
+      <section className="relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          <div className="lg:col-span-3">
+            <div className="lg:sticky lg:top-24">
+              <div className="fg-numeral text-7xl sm:text-8xl leading-none" style={{ color: 'var(--color-wheat)' }}>
+                {num}
+              </div>
+              <div className="mt-2 text-[0.7rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                {kicker}
+              </div>
+              <h3 className="fg-display text-3xl mt-2 leading-tight" style={{ color: 'var(--color-ink)' }}>
+                {title}
+              </h3>
             </div>
           </div>
+          <div className="lg:col-span-9 space-y-5">{children}</div>
+        </div>
+      </section>
+    );
 
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-            <strong>Note:</strong> The full composite score also incorporates distance to the nearest
-            metro area (Haversine distance to a fixed list of US metros). Omitting this component
-            shifts weight to RUCA and density, which is appropriate for most county- or ZIP-level
-            analyses. See the <button
-              onClick={() => { setActiveView('methodology'); window.scrollTo(0, 0); }}
-              className="underline font-medium"
-            >Methodology page</button> for complete weight tables.
+    const InstallRow = ({ name, cmd, href, note }) => {
+      const [copied, setCopied] = React.useState(false);
+      const handleCopy = () => {
+        navigator.clipboard.writeText(cmd).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        });
+      };
+      return (
+        <div className="rounded-lg overflow-hidden border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]"
+             style={{ backgroundColor: 'var(--color-cream)' }}>
+          <div className="flex items-center justify-between px-4 py-2 text-[0.65rem] uppercase tracking-[0.28em] font-mono border-b border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+               style={{ color: 'var(--color-ink-muted)' }}>
+            <span>{name}</span>
+            {note && <span className="text-slate-400 dark:text-slate-500 normal-case tracking-normal font-sans text-[0.7rem] italic">{note}</span>}
+          </div>
+          <div className="flex items-center gap-3 p-3">
+            <code className="flex-1 text-xs sm:text-[0.78rem] font-mono break-all" style={{ color: 'var(--color-ink)' }}>$ {cmd}</code>
+            <button onClick={handleCopy}
+                    className="flex-shrink-0 px-2.5 py-1 text-[0.65rem] uppercase tracking-wider font-mono rounded border transition-colors"
+                    style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            <a href={href} target="_blank" rel="noopener noreferrer"
+               className="flex-shrink-0 text-[0.65rem] uppercase tracking-wider font-mono inline-flex items-center gap-1"
+               style={{ color: 'var(--color-ink-muted)' }}>
+              <ExternalLink className="w-3 h-3" /> Repo
+            </a>
           </div>
         </div>
+      );
+    };
 
-        {/* Download data for analysis */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-2">
-            <Download className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Download Data</h3>
+    return (
+      <div className="space-y-16 sm:space-y-20 pb-8">
+        {/* ── Editorial opening ─────────────────────────────────────── */}
+        <header className="topo-bg rounded-2xl border border-[rgba(26,58,42,0.14)] dark:border-[rgba(255,255,255,0.08)] px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-12"
+                style={{ backgroundColor: 'var(--color-parchment)' }}>
+          <div className="fg-rule mb-8">
+            <span>§ The Data Pavilion</span>
+            <span className="hidden sm:inline">For Researchers</span>
+            <span>Open · Citable · Replicable</span>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            Pre-computed rurality scores for all 3,235 U.S. counties, ready to merge into your analysis by FIPS code.
-            Includes RUCC 2023, population density, distance to metro areas, composite score, and ACS demographics.
-          </p>
 
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-              <div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">County Rurality Dataset (CSV)</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">3,235 counties, 24 variables, ~500KB</p>
-              </div>
-              <a href={`${process.env.PUBLIC_URL}/data/county_rurality.csv`}
-                download="county_rurality.csv"
-                className="flex-shrink-0 flex items-center space-x-2 px-4 py-2 text-white rounded-lg text-sm transition-colors"
-                style={{ backgroundColor: 'var(--color-forest)' }}>
-                <Download className="w-4 h-4" />
-                <span>Download CSV</span>
-              </a>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+            <div className="lg:col-span-8">
+              <h2 className="fg-display text-4xl sm:text-5xl lg:text-6xl leading-[0.95]" style={{ color: 'var(--color-ink)' }}>
+                Take the <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>data</em>,
+                the <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>code</em>,
+                and go.
+              </h2>
+              <p className="mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300"
+                 style={{ fontFamily: 'var(--font-display)' }}>
+                Rurality.app is built on publicly available federal datasets and a transparent
+                composite methodology. Everything you need to cite the tool, replicate the
+                scores in R, and merge the underlying data into your own analysis &mdash; here,
+                one page down.
+              </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
-              <div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">R Package</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono flex items-center gap-2">
-                  <code>devtools::install_github("cwimpy/rurality")</code>
-                  <button onClick={() => { navigator.clipboard.writeText('devtools::install_github("cwimpy/rurality")'); }} className="text-green-600 hover:text-green-800 text-[10px] underline">copy</button>
-                </p>
-              </div>
-              <a href="https://github.com/cwimpy/rurality" target="_blank" rel="noopener noreferrer"
-                className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
-                <ExternalLink className="w-3 h-3" />
-                <span>GitHub</span>
-              </a>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
-              <div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Stata Package</div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono flex items-center gap-2">
-                  <code>net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")</code>
-                  <button onClick={() => { navigator.clipboard.writeText('net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")'); }} className="text-green-600 hover:text-green-800 text-[10px] underline">copy</button>
-                </p>
-              </div>
-              <a href="https://github.com/cwimpy/rurality-stata" target="_blank" rel="noopener noreferrer"
-                className="flex-shrink-0 flex items-center space-x-2 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors">
-                <ExternalLink className="w-3 h-3" />
-                <span>GitHub</span>
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* REST API */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-2">
-            <Zap className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">REST API</h3>
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            Query rurality scores programmatically. No authentication required. Returns JSON with RUCC codes,
-            composite scores, demographics, and score components for all 3,235 U.S. counties.
-          </p>
-
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Endpoints</p>
-              <div className="space-y-2">
+            <aside className="lg:col-span-4">
+              <div className="pl-5 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+                <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-3 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  At a glance
+                </div>
                 {[
-                  { label: 'Single county by FIPS', url: '/api/score?fips=05031' },
-                  { label: 'All counties in a state', url: '/api/score?state=AR' },
-                  { label: 'Search by county name', url: '/api/score?q=Craighead&limit=10' },
-                ].map(({ label, url }) => (
-                  <div key={url} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 sm:w-44 flex-shrink-0">{label}</span>
-                    <code className="text-xs text-green-700 dark:text-green-400 font-mono break-all">
-                      https://rurality.app{url}
-                    </code>
+                  ['3,235', 'counties, ready to merge'],
+                  ['24',    'variables in the CSV'],
+                  ['4',     'ways in: CSV · R · Stata · API'],
+                ].map(([n, l], i, arr) => (
+                  <div key={l} className={`flex items-baseline gap-3 ${i !== arr.length - 1 ? 'mb-2 pb-2 border-b border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]' : ''}`}>
+                    <div className="fg-numeral text-3xl" style={{ color: 'var(--color-ink)' }}>{n}</div>
+                    <div className="text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">{l}</div>
                   </div>
                 ))}
               </div>
-            </div>
+            </aside>
+          </div>
+        </header>
 
-            <div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Example in R</p>
-              <CodeBlock code={`library(httr2)
+        {/* ── §1 Cite ───────────────────────────────────────────────── */}
+        <Chapter num="§1" kicker="Credit the Tool" title={<>How to <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>cite</em>.</>}>
+          <div className="rounded-lg border-2 border-dashed border-[rgba(26,58,42,0.22)] dark:border-[rgba(255,255,255,0.14)] p-5 sm:p-6"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-3"
+                 style={{ color: 'var(--color-ink-muted)' }}>
+              <span>Cite as &mdash; APA 7</span>
+              <button onClick={copyCitation}
+                      className="px-2.5 py-1 rounded border transition-colors"
+                      style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                {citationCopied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-base sm:text-lg leading-relaxed"
+               style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}>
+              {citation}
+            </p>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            If you use the composite Rural Index methodology in published work, please also cite
+            the underlying USDA ERS data sources listed in &sect;5.
+          </p>
+        </Chapter>
+
+        {/* ── §2 Suggested uses ─────────────────────────────────────── */}
+        <Chapter num="§2" kicker="Where it Fits" title={<>Suggested <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>uses</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            A sampling of the research designs the index and its inputs tend to serve &mdash;
+            drawn from political science, public health, education, and grantwriting practice.
+          </p>
+          <ol className="divide-y divide-dashed divide-[rgba(26,58,42,0.18)] dark:divide-[rgba(255,255,255,0.1)] border-y border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
+            {uses.map(({ title, desc }, i) => (
+              <li key={title} className="grid grid-cols-[auto_1fr] gap-5 py-4">
+                <span className="fg-numeral text-2xl sm:text-3xl w-10" style={{ color: 'var(--color-wheat)' }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <div className="fg-display text-lg" style={{ color: 'var(--color-ink)' }}>{title}</div>
+                  <div className="text-sm text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">{desc}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Chapter>
+
+        {/* ── §3 Access — four ways in ──────────────────────────────── */}
+        <Chapter num="§3" kicker="Four Ports of Entry" title={<>Get the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>data</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Pre-computed rurality scores for all 3,235 U.S. counties, ready to merge by FIPS.
+            Includes RUCC 2023, population density, distance to metro, composite score, and ACS
+            demographics. Pick the route that fits your workflow.
+          </p>
+
+          {/* Primary CSV download — prominent */}
+          <div className="rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-5"
+               style={{ backgroundColor: 'var(--color-forest)' }}>
+            <div className="flex-1">
+              <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-wheat)' }}>
+                Primary artifact · № 01
+              </div>
+              <div className="fg-display text-2xl text-white">County Rurality Dataset</div>
+              <div className="mt-1 text-sm text-white/70">
+                <MetaKV k="Format" v="CSV" />
+                <MetaKV k="Rows" v="3,235 counties" />
+                <MetaKV k="Variables" v="24" />
+                <MetaKV k="Size" v="≈ 500 KB" />
+              </div>
+            </div>
+            <a href={`${process.env.PUBLIC_URL}/data/county_rurality.csv`}
+               download="county_rurality.csv"
+               className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-md text-sm uppercase tracking-wider font-mono border"
+               style={{ backgroundColor: 'var(--color-wheat)', color: '#1a3a2a', borderColor: 'var(--color-wheat)' }}>
+              <Download className="w-4 h-4" />
+              <span>Download CSV</span>
+            </a>
+          </div>
+
+          {/* Package installs */}
+          <div className="grid grid-cols-1 gap-3">
+            <InstallRow
+              name="№ 02 · R Package (CRAN)"
+              note="install from CRAN or GitHub"
+              cmd='install.packages("rurality")'
+              href="https://github.com/cwimpy/rurality"
+            />
+            <InstallRow
+              name="№ 03 · Stata Package"
+              note="via net install"
+              cmd='net install rurality, from("https://raw.githubusercontent.com/cwimpy/rurality-stata/main/")'
+              href="https://github.com/cwimpy/rurality-stata"
+            />
+          </div>
+        </Chapter>
+
+        {/* ── §4 REST API ───────────────────────────────────────────── */}
+        <Chapter num="§4" kicker="Programmatic Access" title={<>The <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>endpoint</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Query rurality scores programmatically. No authentication. Returns JSON with RUCC
+            codes, composite scores, demographics, and score components for all 3,235 U.S. counties.
+          </p>
+
+          {/* Endpoints as terminal */}
+          <div className="rounded-lg overflow-hidden border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]"
+               style={{ backgroundColor: '#0f1a15' }}>
+            <div className="px-4 py-2 flex items-center justify-between border-b border-white/10">
+              <span className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-wheat)' }}>Endpoints</span>
+              <span className="flex gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#5c6b62' }} />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#7a8f82' }} />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--color-sage)' }} />
+              </span>
+            </div>
+            <div className="px-4 py-3 font-mono text-xs sm:text-[0.78rem] text-white/85 space-y-2">
+              {[
+                ['Single county by FIPS',     '/api/score?fips=05031'],
+                ['All counties in a state',   '/api/score?state=AR'],
+                ['Search by county name',     '/api/score?q=Craighead&limit=10'],
+              ].map(([label, url]) => (
+                <div key={url} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+                  <span className="text-white/40 sm:w-52 flex-shrink-0"># {label}</span>
+                  <span>
+                    <span className="text-white/50">GET </span>
+                    <span style={{ color: 'var(--color-wheat)' }}>https://rurality.app</span>
+                    <span className="text-white">{url}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-sage) ' }}>
+              Example in R
+            </div>
+            <CodeBlock code={`library(httr2)
 library(jsonlite)
 
 # Get all Arkansas counties
@@ -1601,11 +2283,13 @@ ar <- fromJSON(resp_body_string(resp))$results
 # Merge onto your data by FIPS
 your_data <- your_data |>
   left_join(ar, by = "fips")`} />
-            </div>
+          </div>
 
-            <div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Example response</p>
-              <CodeBlock code={`{
+          <div>
+            <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-sage) ' }}>
+              Example response
+            </div>
+            <CodeBlock code={`{
   "count": 1,
   "results": [{
     "fips": "05031",
@@ -1622,97 +2306,121 @@ your_data <- your_data |>
     }
   }]
 }`} />
-            </div>
-
-            <p className="text-xs text-slate-400">
-              The API serves pre-computed county-level data. For ZIP-level RUCA lookups,
-              use the R or Stata packages above.
-            </p>
           </div>
-        </div>
 
-        {/* Data sources with download links */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <Database className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Data Sources &amp; Downloads</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            The API serves pre-computed county-level data. For ZIP-level RUCA lookups,
+            use the R or Stata packages in &sect;3.
+          </p>
+        </Chapter>
+
+        {/* ── §5 R replication walkthrough ──────────────────────────── */}
+        <Chapter num="§5" kicker="Step-by-Step in R" title={<>Replicate the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>score</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            The composite Rural Index can be replicated entirely in R using the same USDA and
+            Census data this app uses. The five exhibits below walk through each step.
+          </p>
+
+          <ol className="space-y-6">
+            {steps.map(({ n, title: t, code }, i) => (
+              <li key={n} className="relative pl-6 sm:pl-8">
+                <span className="absolute left-0 top-0 bottom-0 w-px" style={{ backgroundColor: 'rgba(26,58,42,0.15)' }} aria-hidden />
+                <span className="absolute left-[-0.4rem] top-1 w-3 h-3 rounded-full"
+                      style={{ backgroundColor: 'var(--color-wheat)', boxShadow: '0 0 0 4px var(--color-cream)' }} aria-hidden />
+                <div className="flex items-baseline gap-3 mb-2">
+                  <span className="fg-numeral text-2xl" style={{ color: 'var(--color-wheat)' }}>{n}</span>
+                  <span className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>Exhibit {n} of {String(steps.length).padStart(2, '0')}</span>
+                </div>
+                <h4 className="fg-display text-xl mb-3" style={{ color: 'var(--color-ink)' }}>{t}</h4>
+                <CodeBlock code={code} />
+              </li>
+            ))}
+          </ol>
+
+          <div className="rounded-lg px-4 py-3 border-l-4 text-sm"
+               style={{ borderColor: 'var(--color-wheat)', backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+            <span className="font-mono text-[0.65rem] uppercase tracking-[0.24em] mr-2" style={{ color: 'var(--color-ink-muted)' }}>Note</span>
+            The full composite score also incorporates distance to the nearest metro area.
+            Omitting this component shifts weight to RUCA and density, which is appropriate for
+            most county- or ZIP-level analyses. See the {' '}
+            <button onClick={() => { setActiveView('methodology'); window.scrollTo(0, 0); }}
+                    className="underline font-medium">
+              Methodology page
+            </button>{' '}
+            for complete weight tables.
           </div>
-          <div className="space-y-3">
-            {[
-              {
-                name: 'USDA ERS Rural-Urban Commuting Area Codes (RUCA) 2020',
-                desc: 'ZIP/ZCTA level · 41,146 areas · Primary RUCA code 1–10',
-                page: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/',
-                file: 'https://www.ers.usda.gov/media/5442/2020-rural-urban-commuting-area-codes-zip-codes.xlsx',
-                fileLabel: 'Download XLSX'
-              },
-              {
-                name: 'USDA ERS Rural-Urban Continuum Codes (RUCC) 2023',
-                desc: 'County level · 3,233 US counties · RUCC code 1–9',
-                page: 'https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/',
-                file: 'https://www.ers.usda.gov/media/5767/2023-rural-urban-continuum-codes.xlsx',
-                fileLabel: 'Download XLSX'
-              },
-              {
-                name: 'US Census Bureau ACS 5-Year Estimates',
-                desc: '2018–2022 vintages · Population, income, unemployment · County level',
-                page: 'https://www.census.gov/programs-surveys/acs',
-                file: 'https://api.census.gov/data/2022/acs/acs5/variables.html',
-                fileLabel: 'Variable list'
-              },
-              {
-                name: 'US Census Bureau Geocoder API',
-                desc: 'Coordinate → county FIPS + land area · Used for density calculation',
-                page: 'https://geocoding.geo.census.gov/geocoder/',
-                file: null,
-                fileLabel: null
-              },
-            ].map(({ name, desc, page, file, fileLabel }) => (
-              <div key={name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
+        </Chapter>
+
+        {/* ── §6 Data Sources ───────────────────────────────────────── */}
+        <Chapter num="§6" kicker="The Catalogue" title={<>Source <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>datasets</em>.</>}>
+          <ul className="divide-y divide-dashed divide-[rgba(26,58,42,0.18)] dark:divide-[rgba(255,255,255,0.1)] border-y border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
+            {sources.map(({ n, name, vintage, size, desc, page, file, fileLabel }) => (
+              <li key={n} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-3 sm:gap-6 py-4 items-baseline">
+                <span className="fg-numeral text-2xl sm:text-3xl w-10" style={{ color: 'var(--color-wheat)' }}>{n}</span>
                 <div>
                   <a href={page} target="_blank" rel="noopener noreferrer"
-                    className="text-sm font-semibold text-slate-800 dark:text-slate-100 hover:text-slate-900 transition-colors flex items-center gap-1">
-                    {name} <ExternalLink className="w-3 h-3" />
+                     className="fg-display text-lg leading-tight inline-flex items-baseline gap-1.5 hover:underline"
+                     style={{ color: 'var(--color-ink)' }}>
+                    {name} <ExternalLink className="w-3 h-3 self-center" />
                   </a>
-                  <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{desc}</div>
+                  <div className="mt-1 text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                    Vintage {vintage} &middot; {size}
+                  </div>
                 </div>
                 {file && (
                   <a href={file} target="_blank" rel="noopener noreferrer"
-                    className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors whitespace-nowrap">
-                    {fileLabel}
+                     className="self-baseline sm:self-center flex-shrink-0 px-3 py-1.5 text-[0.7rem] uppercase tracking-[0.2em] font-mono rounded border inline-flex items-center gap-1.5"
+                     style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                    <Download className="w-3 h-3" /> {fileLabel}
                   </a>
                 )}
-              </div>
+              </li>
             ))}
+          </ul>
+        </Chapter>
+
+        {/* ── §7 Embed ──────────────────────────────────────────────── */}
+        <Chapter num="§7" kicker="On Your Own Site" title={<>Embed the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>widget</em>.</>}>
+          <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <EmbedWidget />
           </div>
-        </div>
+        </Chapter>
 
-        {/* Embed widget */}
-        <EmbedWidget />
-
-        {/* Collaboration */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-green-100 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Collaboration &amp; Feedback</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-            If you use Rurality.app in published research, we would love to hear about it.
-            Bug reports, methodology suggestions, and data quality issues are tracked on GitHub.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <a href="https://github.com/cwimpy/rurality-app/issues"
-              target="_blank" rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg text-sm transition-colors">
-              <ExternalLink className="w-4 h-4" />
-              <span>Open a GitHub Issue</span>
-            </a>
-            <a href="https://github.com/cwimpy/rurality-app"
-              target="_blank" rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg text-sm transition-colors">
-              <ExternalLink className="w-4 h-4" />
-              <span>View Source on GitHub</span>
-            </a>
+        {/* ── End-matter: collaboration ─────────────────────────────── */}
+        <section className="border-t border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] pt-10">
+          <div className="fg-rule mb-6">
+            <span>End-matter</span>
+            <span>Collaboration &amp; Feedback</span>
           </div>
-        </div>
-
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8">
+              <p className="fg-display text-2xl sm:text-3xl leading-snug italic" style={{ color: 'var(--color-ink)' }}>
+                If you use Rurality.app in published research, we would love to hear about it.
+              </p>
+              <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl">
+                Bug reports, methodology suggestions, and data quality issues are tracked on GitHub.
+              </p>
+            </div>
+            <div className="lg:col-span-4 flex flex-col gap-3">
+              <a href="https://github.com/cwimpy/rurality-app/issues"
+                 target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-between px-4 py-3 rounded-md text-sm uppercase tracking-wider font-mono"
+                 style={{ backgroundColor: 'var(--color-forest)', color: '#fff' }}>
+                <span>Open a GitHub Issue</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              <a href="https://github.com/cwimpy/rurality-app"
+                 target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-between px-4 py-3 rounded-md text-sm uppercase tracking-wider font-mono border"
+                 style={{ borderColor: 'var(--color-forest)', color: 'var(--color-ink)' }}>
+                <span>View Source</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </section>
       </div>
     );
   };
@@ -1724,7 +2432,7 @@ your_data <- your_data |>
         Skip to content
       </a>
       {/* Header */}
-      <header className="sticky top-0 z-50" style={{ backgroundColor: 'var(--color-forest)' }}>
+      <header className="sticky top-0 z-50 border-b" style={{ backgroundColor: 'var(--color-forest)', borderColor: 'rgba(212,168,67,0.25)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <button
@@ -1736,13 +2444,18 @@ your_data <- your_data |>
                 alt="Rurality.app logo"
                 className="w-7 h-7"
               />
-              <h1 className="text-lg font-bold text-white tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                Rurality.app
-              </h1>
+              <div className="text-left">
+                <h1 className="text-lg font-bold text-white tracking-tight leading-none" style={{ fontFamily: 'var(--font-display)' }}>
+                  Rurality.app
+                </h1>
+                <div className="hidden sm:block text-[0.55rem] uppercase tracking-[0.28em] font-mono leading-tight" style={{ color: 'var(--color-wheat)' }}>
+                  A Field Guide &middot; Ed. 2026
+                </div>
+              </div>
             </button>
 
             {/* Desktop nav */}
-            <nav className="hidden md:flex space-x-0.5">
+            <nav className="hidden md:flex items-center gap-0">
               {[
                 { id: 'dashboard',    label: 'Dashboard',       icon: BarChart3 },
                 { id: 'map',          label: 'Map',             icon: MapPin },
@@ -1752,30 +2465,36 @@ your_data <- your_data |>
                 { id: 'methodology',  label: 'Methodology',     icon: FlaskConical },
                 { id: 'researchers',  label: 'For Researchers',  icon: BookOpen },
                 { id: 'about',        label: 'About',           icon: Info }
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  title={label}
-                  aria-label={label}
-                  onClick={() => {
-                    setActiveView(id);
-                    if (id === 'trends' && locationMeta && !trendsData && !trendsLoading) {
-                      setTrendsLoading(true);
-                      fetchMultiYearCensusData(locationMeta.stateFips, locationMeta.countyFips)
-                        .then(data => { setTrendsData(data); setTrendsLoading(false); })
-                        .catch(() => setTrendsLoading(false));
-                    }
-                  }}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    activeView === id
-                      ? 'bg-white/20 text-white'
-                      : 'text-white/60 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                </button>
-              ))}
+              ].map(({ id, label, icon: Icon }) => {
+                const active = activeView === id;
+                return (
+                  <button
+                    key={id}
+                    title={label}
+                    aria-label={label}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => {
+                      setActiveView(id);
+                      if (id === 'trends' && locationMeta && !trendsData && !trendsLoading) {
+                        setTrendsLoading(true);
+                        fetchMultiYearCensusData(locationMeta.stateFips, locationMeta.countyFips)
+                          .then(data => { setTrendsData(data); setTrendsLoading(false); })
+                          .catch(() => setTrendsLoading(false));
+                      }
+                    }}
+                    className="relative flex items-center gap-1.5 px-3 py-1.5 text-[0.7rem] uppercase tracking-[0.18em] font-mono transition-colors"
+                    style={{ color: active ? 'var(--color-wheat)' : 'rgba(255,255,255,0.65)' }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{label}</span>
+                    {active && (
+                      <span className="absolute left-3 right-3 -bottom-[1px] h-[2px]" style={{ backgroundColor: 'var(--color-wheat)' }} />
+                    )}
+                  </button>
+                );
+              })}
             </nav>
 
             <div className="flex items-center space-x-1">
@@ -1832,10 +2551,12 @@ your_data <- your_data |>
 
       {/* Development notice */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-md border-l-4 px-4 py-3 text-xs sm:text-[0.78rem] leading-relaxed"
+             style={{ borderColor: 'var(--color-wheat)', backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-wheat)' }} />
           <div>
-            <strong>Research tool in development.</strong> The composite Rural Index score is a working draft and has not yet been peer reviewed or formally validated. It should not be cited as a finalized measure. The underlying USDA RUCA codes, RUCC codes, and Census data are official federal datasets and may be used independently. We welcome <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-900 dark:hover:text-amber-200">feedback</a>.
+            <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Advisory</span>
+            <strong>Research tool in development.</strong> The composite Rural Index score is a working draft and has not yet been peer reviewed or formally validated. It should not be cited as a finalized measure. The underlying USDA RUCA codes, RUCC codes, and Census data are official federal datasets and may be used independently. We welcome <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: 'var(--color-ink-muted)' }}>feedback</a>.
           </div>
         </div>
       </div>
@@ -1843,81 +2564,112 @@ your_data <- your_data |>
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search — hidden on static pages */}
         <div className={`mb-6 ${['about', 'methodology', 'researchers', 'batch', 'statemap'].includes(activeView) ? 'hidden' : ''}`}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-5">
+          <div className="rounded-lg border border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)] p-5 sm:p-6"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="fg-rule mb-4">
+              <span>Field Inquiry</span>
+              <span>City &middot; County &middot; ZIP</span>
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-ink-muted)' }} />
                 <input
                   type="text"
-                  placeholder="Enter city, county, or ZIP code…"
+                  placeholder="Enter a city, county, or ZIP code…"
                   aria-label="Search for a location"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery).catch(() => {})}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 rounded-xl focus:ring-2 focus:border-transparent outline-none transition-shadow"
-                  style={{ '--tw-ring-color': 'var(--color-sage)' }}
+                  className="w-full pl-10 pr-4 py-3 bg-transparent border-b-2 text-base outline-none transition-colors"
+                  style={{
+                    borderColor: 'var(--color-rule)',
+                    color: 'var(--color-ink)',
+                    fontFamily: 'var(--font-display)',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--color-wheat)'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(26,58,42,0.22)'}
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={getCurrentLocation}
                   disabled={loading}
-                  className="flex items-center space-x-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-md text-xs uppercase tracking-wider font-mono border transition-colors disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}
                 >
-                  <Navigation className="w-4 h-4" />
+                  <Navigation className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">GPS</span>
                 </button>
                 <button
                   onClick={() => handleLocationSearch(searchQuery).catch(() => {})}
                   disabled={loading || !searchQuery.trim()}
-                  className="flex items-center space-x-2 px-6 py-3 text-white rounded-xl transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: loading ? 'var(--color-sage)' : 'var(--color-forest)' }}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-md text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: loading ? 'var(--color-sage)' : 'var(--color-forest)',
+                    color: loading ? 'var(--color-parchment)' : 'var(--color-wheat)',
+                  }}
                 >
                   {loading ? (
                     <>
-                      <svg className="animate-spin-slow w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <svg className="animate-spin-slow w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" />
                       </svg>
                       <span className="hidden sm:inline">{loadingStep || 'Analyzing…'}</span>
                       <span className="sm:hidden">…</span>
                     </>
-                  ) : 'Analyze'}
+                  ) : (
+                    <>
+                      <span>Analyze</span>
+                      <span aria-hidden>&rarr;</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700">
+              <div className="mt-4 flex items-center gap-2 rounded-md border-l-4 px-4 py-3 text-sm"
+                   style={{ borderColor: '#991b1b', backgroundColor: 'var(--color-parchment)', color: '#991b1b' }}>
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span className="text-sm">{error}</span>
+                <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-1" style={{ color: '#991b1b' }}>Error</span>
+                <span>{error}</span>
               </div>
             )}
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(recentSearches.length > 0
-                ? recentSearches.map(r => r.query)
-                : ['Jonesboro, AR', 'Jasper, AR', 'Billings, MT', 'Orange County, CA', 'Travis County, TX', 'Story County, IA']
-              ).map((place) => (
-                <button
-                  key={place}
-                  onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
-                  disabled={loading}
-                  className="px-3 py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full transition-colors border border-slate-200 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-50"
-                >
-                  {place}
-                </button>
-              ))}
-            </div>
-            {recentSearches.length > 0 && (
-              <div className="mt-1 text-right">
-                <button
-                  onClick={() => { setRecentSearches([]); try { localStorage.removeItem('rurality-recent'); } catch {} }}
-                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                >
-                  Clear recent
-                </button>
+            <div className="mt-4 pt-3 border-t border-dashed border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
+              <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+                {recentSearches.length > 0 ? 'Recent' : 'Try an Example'}
               </div>
-            )}
+              <div className="flex flex-wrap gap-2">
+                {(recentSearches.length > 0
+                  ? recentSearches.map(r => r.query)
+                  : ['Jonesboro, AR', 'Jasper, AR', 'Billings, MT', 'Orange County, CA', 'Travis County, TX', 'Story County, IA']
+                ).map((place) => (
+                  <button
+                    key={place}
+                    onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
+                    disabled={loading}
+                    className="px-3 py-1 text-xs uppercase tracking-wider font-mono rounded border transition-colors disabled:opacity-50"
+                    style={{ borderColor: 'var(--color-rule)', color: 'var(--color-ink)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-wheat)'; e.currentTarget.style.color = 'var(--color-wheat)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(26,58,42,0.2)'; e.currentTarget.style.color = 'var(--color-forest)'; }}
+                  >
+                    {place}
+                  </button>
+                ))}
+              </div>
+              {recentSearches.length > 0 && (
+                <div className="mt-2 text-right">
+                  <button
+                    onClick={() => { setRecentSearches([]); try { localStorage.removeItem('rurality-recent'); } catch {} }}
+                    className="text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+                    style={{ color: 'var(--color-ink-muted)' }}
+                  >
+                    Clear recent
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1934,65 +2686,80 @@ your_data <- your_data |>
         {ruralityData && activeView === 'dashboard' && (
           <div className="space-y-6">
             {/* Overview */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 sm:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 md:gap-10 items-center mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2" style={{ fontFamily: 'var(--font-display)' }}>{currentLocation}</h2>
-                  <div className="flex items-center space-x-4">
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getRuralityLevel(ruralityData.overallScore).color}`}>
-                      {getRuralityLevel(ruralityData.overallScore).level}
-                    </div>
+                  <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
+                    Field Report
+                  </div>
+                  <h2 className="fg-display text-3xl sm:text-4xl mb-3 leading-tight" style={{ color: 'var(--color-ink)' }}>
+                    {currentLocation}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                     {ruralityData.demographics?.population > 0 && (
-                      <div className="text-sm text-slate-500 dark:text-slate-400">
-                        Population: {ruralityData.demographics.population.toLocaleString()}
+                      <div className="text-slate-600 dark:text-slate-400">
+                        <span className="text-[0.65rem] uppercase tracking-wider font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Pop.</span>
+                        <span style={{ color: 'var(--color-ink)' }}>{ruralityData.demographics.population.toLocaleString()}</span>
                       </div>
                     )}
-                    <div className="text-xs text-slate-400 italic">
-                      Confidence: {ruralityData.confidence}
+                    <div className="text-slate-600 dark:text-slate-400">
+                      <span className="text-[0.65rem] uppercase tracking-wider font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Confidence</span>
+                      <span className="italic" style={{ color: 'var(--color-ink)' }}>{ruralityData.confidence}</span>
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-forest)' }}>
-                    {ruralityData.overallScore}
-                  </div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">Rural Index Score</div>
+                <div className="flex justify-center md:justify-end">
+                  <ScoreDial
+                    score={ruralityData.overallScore}
+                    confidence={ruralityData.confidence}
+                    size={260}
+                  />
                 </div>
               </div>
 
-              {/* Metrics grid */}
+              {/* Metrics grid — field-guide exhibit tiles */}
+              <div className="fg-rule mb-4">
+                <span>Exhibit A</span>
+                <span>Indicators</span>
+              </div>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                 {Object.entries(ruralityData.metrics).map(([key, metric]) => {
                   const Icon = metric.icon;
+                  const mColor = metric.score >= 80 ? '#1a5c2e'
+                               : metric.score >= 60 ? '#4a7c59'
+                               : metric.score >= 40 ? '#a17321'
+                               : metric.score >= 20 ? '#b45309'
+                               :                      '#991b1b';
                   return (
-                    <div key={key} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700 shadow-sm">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--color-parchment)' }}>
-                          <Icon className="w-4 h-4" style={{ color: 'var(--color-sage)' }} />
+                    <div key={key} className="rounded-lg p-4 border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]"
+                         style={{ backgroundColor: 'var(--color-cream)' }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-3.5 h-3.5" style={{ color: 'var(--color-ink-muted)' }} />
+                          <span className="text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                            {metric.label}
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <h4 className="text-sm font-medium text-slate-700">{metric.label}</h4>
-                          <div className="text-xs font-medium" style={{ color: 'var(--color-sage)' }}>{metric.score}/100</div>
-                        </div>
+                        <span className="text-[0.65rem] uppercase tracking-wider font-mono" style={{ color: mColor }}>
+                          {metric.score}/100
+                        </span>
                       </div>
-                      <div className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                      <div className="fg-numeral text-3xl mb-2" style={{ color: 'var(--color-ink)' }}>
                         {typeof metric.value === 'number' && metric.value % 1 !== 0
                           ? metric.value.toFixed(1) : metric.value}
                       </div>
-                      <div className="w-full bg-green-200 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-red-400 via-yellow-400 to-green-500 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${metric.score}%` }}
-                        />
+                      <div className="w-full h-1 rounded-full" style={{ backgroundColor: 'var(--color-rule-soft)' }}>
+                        <div className="h-full rounded-full transition-all duration-500"
+                             style={{ width: `${metric.score}%`, backgroundColor: mColor }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Demographics */}
+              {/* Demographics — meta strip */}
               {ruralityData.demographics && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-y border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]">
                   {[
                     { value: ruralityData.demographics.medianAge, label: 'Median Age' },
                     { value: ruralityData.demographics.medianIncome
@@ -2001,11 +2768,14 @@ your_data <- your_data |>
                     { value: ruralityData.demographics.unemploymentRate
                         ? `${ruralityData.demographics.unemploymentRate}%`
                         : 'N/A', label: 'Unemployment' },
-                    { value: ruralityData.overallScore, label: 'Rural Score', highlight: true }
-                  ].map(({ value, label, highlight }) => (
-                    <div key={label} className="text-center">
-                      <div className={`text-lg font-bold ${highlight ? 'text-green-600' : 'text-slate-800'}`}>{value}</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-300">{label}</div>
+                    { value: ruralityData.overallScore, label: 'Rural Index' },
+                  ].map(({ value, label }, i, arr) => (
+                    <div key={label}
+                         className={`py-4 px-3 text-center ${i !== arr.length - 1 ? 'md:border-r border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]' : ''}`}>
+                      <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-1" style={{ color: 'var(--color-ink-muted)' }}>
+                        {label}
+                      </div>
+                      <div className="fg-numeral text-2xl" style={{ color: 'var(--color-ink)' }}>{value}</div>
                     </div>
                   ))}
                 </div>
@@ -2013,28 +2783,41 @@ your_data <- your_data |>
 
               {/* Data sources note */}
               {ruralityData.methodology && (
-                <div className="mt-4 text-xs text-slate-400">
-                  Sources: {ruralityData.methodology.sources.join(' • ')}
+                <div className="mt-4 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  Sources &mdash; {ruralityData.methodology.sources.join(' · ')}
                 </div>
               )}
 
               {/* Actions */}
-              <div className="mt-6 pt-6 border-t border-green-100 flex justify-between items-center">
+              <div className="mt-6 pt-5 border-t border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] flex flex-wrap justify-between items-center gap-3">
                 <button
                   onClick={() => addComparison(currentLocation, ruralityData.overallScore)}
                   disabled={comparisonData.some(d => d.name === currentLocation) || comparisonData.length >= 5}
-                  className="flex items-center space-x-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-md text-xs uppercase tracking-wider font-mono border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Add to Comparison ({comparisonData.length}/5)</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add to Comparison &mdash; {comparisonData.length}/5</span>
                 </button>
-                <button
-                  onClick={shareResults}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
-                >
-                  <Share2 className="w-4 h-4" />
-                  <span>Share</span>
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSpecimenOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-md text-xs uppercase tracking-wider font-mono border transition-colors"
+                    style={{ borderColor: 'var(--color-wheat)', color: 'var(--color-wheat)' }}
+                    title="Generate a shareable 1200×630 specimen card"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Specimen Card</span>
+                  </button>
+                  <button
+                    onClick={shareResults}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-md text-xs uppercase tracking-wider font-mono border transition-colors"
+                    style={{ borderColor: 'var(--color-forest)', backgroundColor: 'var(--color-forest)', color: '#fff' }}
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share Report</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2071,119 +2854,281 @@ your_data <- your_data |>
           </div>
         )}
 
-        {/* Welcome hero */}
+        {/* Welcome hero — A Field Guide to Rural America */}
         {!ruralityData && !loading && activeView === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Hero */}
-            <div className="rounded-2xl shadow-md overflow-hidden" style={{ backgroundColor: 'var(--color-forest)' }}>
-              <div className="px-8 py-12 sm:py-16 text-center">
-                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-                  Really, how rural are you?
-                </h2>
-                <p className="text-white/70 max-w-xl mx-auto text-lg leading-relaxed">
-                  We use real data including USDA RUCA codes, Census demographics,
-                  and distance to metro areas to build a composite rurality score
-                  for any location in the United States.
-                </p>
+          <div className="space-y-10 sm:space-y-14">
+            {/* ── Editorial masthead ─────────────────────────────────── */}
+            <section className="topo-bg rounded-2xl border border-[rgba(26,58,42,0.14)] dark:border-[rgba(255,255,255,0.08)] px-6 sm:px-10 pt-8 pb-10 sm:pt-10 sm:pb-14 overflow-hidden"
+                     style={{ backgroundColor: 'var(--color-parchment)' }}>
+              {/* plate number / edition bar */}
+              <div className="fg-rule fg-rise fg-d1 mb-8 sm:mb-10">
+                <span>№ 01</span>
+                <span className="hidden sm:inline">A Field Guide to Rural America</span>
+                <span className="sm:hidden">Field Guide</span>
+                <span>Edition 2026</span>
               </div>
-            </div>
 
-            {/* Example comparison cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { place: 'Jasper, AR',           score: 87, level: 'Very Rural', emoji: '\uD83C\uDF3E', color: '#1a5c2e' },
-                { place: 'Jonesboro, AR',        score: 24, level: 'Suburban',   emoji: '\uD83C\uDFD8\uFE0F', color: '#b45309' },
-                { place: 'Orange County, CA',    score: 8,  level: 'Urban',      emoji: '\uD83C\uDFD9\uFE0F', color: '#991b1b' },
-              ].map(({ place, score, level, emoji, color }) => (
-                <button
-                  key={place}
-                  onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
-                  className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 text-left hover:shadow-md transition-shadow group cursor-pointer border border-transparent hover:border-slate-200"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-2xl">{emoji}</span>
-                    <span className="text-3xl font-bold" style={{ color, fontFamily: 'var(--font-display)' }}>{score}</span>
-                  </div>
-                  <div className="font-semibold text-slate-800 dark:text-slate-100 group-hover:text-slate-900">{place}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{level}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Value props */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { icon: Database, title: 'Real Data', desc: 'USDA RUCA/RUCC codes and US Census Bureau ACS' },
-                { icon: Calculator, title: 'Composite Score', desc: 'Weighted index combining 6 rurality indicators' },
-                { icon: BookOpen, title: 'For Researchers', desc: 'Replication code in R, downloadable data, open methodology' },
-              ].map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex items-start space-x-3 p-4 rounded-xl" style={{ backgroundColor: 'var(--color-parchment)' }}>
-                  <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-sage)' }} />
-                  <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{title}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
-                  </div>
+              {/* headline + scorecard meta */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-end">
+                <div className="lg:col-span-8 fg-rise fg-d2">
+                  <h2 className="fg-display text-5xl sm:text-6xl lg:text-7xl" style={{ color: 'var(--color-ink)' }}>
+                    Really, how
+                    <br />
+                    rural <em className="not-italic" style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>are you</em>
+                    <span style={{ color: 'var(--color-wheat)' }}>?</span>
+                  </h2>
+                  <p className="mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-slate-700 dark:text-slate-300"
+                     style={{ fontFamily: 'var(--font-display)' }}>
+                    A continuous rurality index for every county, ZIP, and
+                    address in the United States &mdash; assembled from USDA,
+                    Census, and federal broadband data.
+                  </p>
                 </div>
-              ))}
-            </div>
+
+                {/* scorecard stat slab */}
+                <aside className="lg:col-span-4 fg-rise fg-d3 relative">
+                  <div className="relative pl-5 sm:pl-6 border-l-2" style={{ borderColor: 'var(--color-wheat)' }}>
+                    <div className="text-[0.65rem] uppercase tracking-[0.28em] mb-4 font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                      The Index · At a Glance
+                    </div>
+                    {[
+                      { n: '3,235',  l: 'U.S. counties covered' },
+                      { n: '41,146', l: 'ZIP Code Tabulation Areas' },
+                      { n: '6',      l: 'Rurality indicators, one score' },
+                    ].map((s, i) => (
+                      <div key={s.n} className={`flex items-baseline gap-3 ${i !== 2 ? 'mb-3 pb-3 border-b border-dashed border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]' : ''}`}>
+                        <div className="fg-numeral text-3xl sm:text-4xl" style={{ color: 'var(--color-ink)' }}>{s.n}</div>
+                        <div className="text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </aside>
+              </div>
+
+              {/* pull-quote */}
+              <blockquote className="fg-rise fg-d4 mt-10 sm:mt-14 max-w-3xl mx-auto text-center px-2">
+                <div className="fg-display text-2xl sm:text-3xl leading-snug italic"
+                     style={{ color: 'var(--color-ink)' }}>
+                  &ldquo;Rural is not a place on a map &mdash; it is a gradient
+                  of distance, density, and access that no single code can
+                  capture alone.&rdquo;
+                </div>
+                <div className="mt-4 text-[0.7rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  &mdash; Working Methodology, §2
+                </div>
+              </blockquote>
+            </section>
+
+            {/* ── Example lookups ─────────────────────────────────────── */}
+            <section>
+              <div className="fg-rule fg-rise fg-d3 mb-6">
+                <span>Try an Example</span>
+                <span>Tap a place to see its score</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                {[
+                  { num: '01', place: 'Jasper, AR',        region: 'Ozarks · Newton County',     score: 87, level: 'Very Rural', color: '#1a5c2e' },
+                  { num: '02', place: 'Jonesboro, AR',     region: 'Delta · Craighead County',   score: 24, level: 'Suburban',   color: '#b45309' },
+                  { num: '03', place: 'Orange County, CA', region: 'L.A. Basin · Pacific Coast', score: 8,  level: 'Urban',      color: '#991b1b' },
+                ].map(({ num, place, region, score, level, color }, i) => (
+                  <button
+                    key={place}
+                    onClick={() => { setSearchQuery(place); handleLocationSearch(place).catch(() => {}); }}
+                    className={`fg-plate fg-rise fg-d${i + 2} rounded-lg p-5 text-left group`}
+                    aria-label={`Look up ${place}, example score ${score}, ${level}`}
+                  >
+                    {/* top meta row */}
+                    <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                      <span>Example № {num}</span>
+                      <span>{level}</span>
+                    </div>
+
+                    {/* numeral + level */}
+                    <div className="mt-3 flex items-end justify-between">
+                      <div className="fg-numeral text-[5.5rem] sm:text-[6rem]" style={{ color }}>{score}</div>
+                      <div className="pb-2 text-right">
+                        <div className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 font-mono">out of 100</div>
+                        <div className="mt-1 text-xs uppercase tracking-widest font-semibold" style={{ color }}>Rurality</div>
+                      </div>
+                    </div>
+
+                    {/* place */}
+                    <div className="mt-4 pt-4 border-t border-dashed border-[rgba(26,58,42,0.2)] dark:border-[rgba(255,255,255,0.12)]">
+                      <div className="fg-display text-2xl leading-tight" style={{ color: 'var(--color-ink)' }}>
+                        {place}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 italic">
+                        {region}
+                      </div>
+                    </div>
+
+                    {/* footer hint */}
+                    <div className="mt-4 flex items-center justify-between text-[0.7rem] uppercase tracking-[0.2em] font-mono">
+                      <span className="text-slate-400 dark:text-slate-500">Example</span>
+                      <span className="transition-transform group-hover:translate-x-1" style={{ color: 'var(--color-ink-muted)' }}>
+                        Look up &rarr;
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* ── Value props as catalogued entries ───────────────────── */}
+            <section>
+              <div className="fg-rule fg-rise fg-d3 mb-6">
+                <span>What's Inside</span>
+                <span>Built for research & reuse</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 border-t border-b border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]">
+                {[
+                  { icon: Database,   title: 'Federal Data',     desc: 'USDA ERS RUCA & RUCC codes, US Census Bureau ACS 5-year estimates, Census TIGER land area.' },
+                  { icon: Calculator, title: 'Composite Score',  desc: 'Weighted index combining six indicators into a single 0&ndash;100 continuous rurality measure.' },
+                  { icon: BookOpen,   title: 'For Researchers',  desc: 'R (CRAN) and Stata packages, bulk CSV, open methodology, REST API, replication-ready.' },
+                ].map(({ icon: Icon, title, desc }, i) => (
+                  <div key={title}
+                       className={`fg-rise fg-d${i + 2} px-4 sm:px-6 py-6 sm:border-r last:border-r-0 border-b sm:border-b-0 border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-forest)' }}>
+                        <Icon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                        № {String(i + 1).padStart(2, '0')}
+                      </div>
+                    </div>
+                    <div className="fg-display text-xl mb-1" style={{ color: 'var(--color-ink)' }}>{title}</div>
+                    <div className="text-sm leading-relaxed text-slate-600 dark:text-slate-400"
+                         dangerouslySetInnerHTML={{ __html: desc }} />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ── Source ticker ───────────────────────────────────────── */}
+            <section className="fg-rise fg-d5 -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden border-y border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)]"
+                     style={{ backgroundColor: 'var(--color-forest)' }}>
+              <div className="fg-ticker-track flex whitespace-nowrap py-3 text-white/80 text-xs uppercase tracking-[0.3em] font-mono">
+                {Array.from({ length: 2 }).map((_, dup) => (
+                  <div key={dup} className="flex shrink-0" aria-hidden={dup === 1}>
+                    {[
+                      'Sources', 'USDA ERS RUCA 2020', 'USDA ERS RUCC 2023',
+                      'US Census Bureau ACS 2022', 'Census TIGER/Line 2020',
+                      'FCC Area API', 'OpenStreetMap · Nominatim',
+                      'Updated continuously',
+                    ].map((s, i) => (
+                      <span key={`${dup}-${i}`} className="px-6 flex items-center gap-6">
+                        {s}
+                        <span aria-hidden="true" style={{ color: 'var(--color-wheat)' }}>§</span>
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-4">
-              <img
-                src={`${process.env.PUBLIC_URL}/logo.svg`}
-                alt="Rurality.app logo"
-                className="w-12 h-12"
-              />
-              <div>
-                <div className="text-sm font-medium text-slate-700">Built by Cameron Wimpy</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Powered by US Census Bureau, USDA ERS, and FCC data</div>
+      <footer className="mt-16 border-t-2" style={{ backgroundColor: 'var(--color-forest)', borderColor: 'var(--color-wheat)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Top row: brand meta + nav */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+            <div className="md:col-span-5">
+              <div className="flex items-start gap-4">
+                <img src={`${process.env.PUBLIC_URL}/logo.svg`} alt="Rurality.app logo" className="w-12 h-12 flex-shrink-0" />
+                <div>
+                  <div className="fg-display text-2xl leading-tight" style={{ color: 'var(--color-wheat)' }}>
+                    Rurality.app
+                  </div>
+                  <div className="mt-1 text-[0.6rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    A Field Guide to Rural America &middot; Ed. 2026
+                  </div>
+                  <p className="mt-3 text-sm italic leading-relaxed max-w-xs" style={{ color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--font-display)' }}>
+                    Built by Cameron Wimpy for the Institute for Rural Initiatives, Arkansas State University.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <button
-                onClick={() => { setActiveView('about'); window.scrollTo(0, 0); }}
-                className="hover:text-slate-900 transition-colors"
-              >About</button>
-              <button
-                onClick={() => { setActiveView('researchers'); window.scrollTo(0, 0); }}
-                className="hover:text-slate-900 transition-colors"
-              >For Researchers</button>
-              <button
-                onClick={() => { setActiveView('methodology'); window.scrollTo(0, 0); }}
-                className="hover:text-slate-900 transition-colors"
-              >Methodology</button>
-              <a
-                href="https://github.com/cwimpy/rurality-app/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-slate-900 transition-colors"
-              >Contact</a>
-              <a
-                href="https://github.com/cwimpy/rurality-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-slate-900 transition-colors"
-              >GitHub</a>
+
+            <div className="md:col-span-4">
+              <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-3" style={{ color: 'var(--color-wheat)' }}>
+                Navigate
+              </div>
+              <div className="grid grid-cols-2 gap-y-1.5 gap-x-6 text-xs uppercase tracking-wider font-mono">
+                {[
+                  { label: 'Dashboard',     go: () => setActiveView('dashboard') },
+                  { label: 'Methodology',   go: () => setActiveView('methodology') },
+                  { label: 'Researchers',   go: () => setActiveView('researchers') },
+                  { label: 'About',         go: () => setActiveView('about') },
+                ].map(({ label, go }) => (
+                  <button key={label}
+                          onClick={() => { go(); window.scrollTo(0, 0); }}
+                          className="text-left transition-colors"
+                          style={{ color: 'rgba(255,255,255,0.7)' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-wheat)'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}>
+                    {label} &rarr;
+                  </button>
+                ))}
+                <a href="https://github.com/cwimpy/rurality-app/issues" target="_blank" rel="noopener noreferrer"
+                   className="text-left transition-colors" style={{ color: 'rgba(255,255,255,0.7)' }}
+                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-wheat)'}
+                   onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}>
+                  Contact &rarr;
+                </a>
+                <a href="https://github.com/cwimpy/rurality-app" target="_blank" rel="noopener noreferrer"
+                   className="text-left transition-colors" style={{ color: 'rgba(255,255,255,0.7)' }}
+                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-wheat)'}
+                   onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}>
+                  GitHub &rarr;
+                </a>
+              </div>
+            </div>
+
+            <div className="md:col-span-3">
+              <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-3" style={{ color: 'var(--color-wheat)' }}>
+                Sources
+              </div>
+              <ul className="space-y-1 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <li>USDA ERS &middot; RUCA 2020</li>
+                <li>USDA ERS &middot; RUCC 2023</li>
+                <li>U.S. Census Bureau &middot; ACS 2022</li>
+                <li>Census TIGER/Line &middot; FCC</li>
+              </ul>
             </div>
           </div>
-          <div className="mt-6 pt-6 border-t border-green-100 text-center text-xs text-slate-500 dark:text-slate-400">
-            <p>© 2026 Rurality.app • Data from US Census Bureau ACS, USDA ERS RUCA, and USDA ERS RUCC • Not for regulatory use</p>
+
+          {/* Bottom rule + colophon */}
+          <div className="mt-8 pt-5 border-t border-dashed flex flex-col sm:flex-row items-center justify-between gap-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+               style={{ borderColor: 'rgba(212,168,67,0.3)', color: 'rgba(255,255,255,0.5)' }}>
+            <span>&copy; 2026 Rurality.app &middot; Not for regulatory use</span>
+            <span>Set in Source Serif 4 &middot; DM Sans &middot; JetBrains Mono</span>
           </div>
         </div>
       </footer>
+
+      {/* Specimen Card modal */}
+      {specimenOpen && ruralityData && (
+        <SpecimenCard
+          location={currentLocation}
+          score={ruralityData.overallScore}
+          confidence={ruralityData.confidence}
+          classifications={ruralityData.classifications}
+          density={ruralityData.metrics?.populationDensity?.value ?? null}
+          coordinates={ruralityData.coordinates}
+          population={ruralityData.demographics?.population ?? 0}
+          onClose={() => setSpecimenOpen(false)}
+        />
+      )}
 
       {/* Info panel — toggleable */}
       <div className="fixed bottom-4 right-4 z-40">
         {showDataSources ? (
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 p-4 max-w-xs">
             <div className="flex items-start space-x-3">
-              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-sage)' }} />
+              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-ink-muted)' }} />
               <div className="text-sm flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="font-medium text-slate-800 dark:text-slate-100">Live Data Sources</div>
@@ -2206,7 +3151,7 @@ your_data <- your_data |>
             className="bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             title="Live Data Sources"
           >
-            <Info className="w-5 h-5" style={{ color: 'var(--color-sage)' }} />
+            <Info className="w-5 h-5" style={{ color: 'var(--color-ink-muted)' }} />
           </button>
         )}
       </div>
