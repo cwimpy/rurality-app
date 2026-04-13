@@ -1,27 +1,73 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-  <!-- Background -->
+  <defs>
+    <pattern id="topo" x="0" y="0" width="1200" height="630" patternUnits="userSpaceOnUse">
+      <path d="M0 500 Q 300 460 600 490 T 1200 475" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+      <path d="M0 430 Q 300 390 600 420 T 1200 405" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+      <path d="M0 360 Q 300 320 600 350 T 1200 335" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+      <path d="M0 290 Q 300 250 600 280 T 1200 265" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+      <path d="M0 220 Q 300 180 600 210 T 1200 195" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+      <path d="M0 150 Q 300 110 600 140 T 1200 125" fill="none" stroke="#d4a843" stroke-opacity="0.10" stroke-width="1.2"/>
+    </pattern>
+  </defs>
+
+  <!-- Forest base -->
   <rect width="1200" height="630" fill="#1a3a2a"/>
+  <!-- Topographic overlay -->
+  <rect width="1200" height="630" fill="url(#topo)"/>
 
-  <!-- Subtle hills across the bottom -->
-  <path d="M0 520 Q180 450 360 500 Q540 420 720 480 Q900 400 1080 460 Q1140 480 1200 470 L1200 630 L0 630 Z" fill="#2d5a3a" opacity="0.55"/>
-  <path d="M0 570 Q240 500 480 555 Q660 480 840 535 Q1020 470 1200 535 L1200 630 L0 630 Z" fill="#3a6b48" opacity="0.5"/>
+  <!-- Double decorative frame (outer solid, inner dashed) -->
+  <rect x="24" y="24" width="1152" height="582" fill="none" stroke="#d4a843" stroke-opacity="0.45" stroke-width="1.5"/>
+  <rect x="36" y="36" width="1128" height="558" fill="none" stroke="#d4a843" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 4"/>
 
-  <!-- Logo tile (mirrors public/logo.svg, scaled up and placed left) -->
-  <g transform="translate(90, 115) scale(4.0)">
-    <rect width="100" height="100" rx="20" fill="#0f2a1e"/>
-    <path d="M0 82 Q15 68 30 78 Q45 65 60 75 Q75 62 90 72 Q95 76 100 74 L100 100 L0 100 Z" fill="#2d5a3a" opacity="0.6"/>
-    <path d="M0 88 Q20 75 40 84 Q55 72 70 80 Q85 70 100 80 L100 100 L0 100 Z" fill="#3a6b48" opacity="0.5"/>
-    <rect x="12" y="62" width="12" height="20" rx="3" fill="#c4704b"/>
-    <rect x="28" y="48" width="12" height="34" rx="3" fill="#d4a843"/>
-    <rect x="44" y="34" width="12" height="48" rx="3" fill="#b8c97a"/>
-    <rect x="60" y="20" width="12" height="62" rx="3" fill="#7db87d"/>
-    <rect x="76" y="8" width="12" height="74" rx="3" fill="#f0ead6"/>
+  <!-- Masthead rule: № 01 · A FIELD GUIDE TO RURAL AMERICA · EDITION 2026 -->
+  <g font-family="'JetBrains Mono', 'Courier New', monospace" font-size="15" letter-spacing="3.6" fill="#d4a843">
+    <text x="76" y="96" text-anchor="start">№ 01</text>
+    <line x1="160" y1="91" x2="420" y2="91" stroke="#d4a843" stroke-opacity="0.5" stroke-width="1"/>
+    <text x="600" y="96" text-anchor="middle">A FIELD GUIDE TO RURAL AMERICA</text>
+    <line x1="780" y1="91" x2="1040" y2="91" stroke="#d4a843" stroke-opacity="0.5" stroke-width="1"/>
+    <text x="1124" y="96" text-anchor="end">EDITION 2026</text>
   </g>
 
-  <!-- Text block -->
-  <g font-family="Helvetica, Arial, sans-serif" fill="#f0ead6">
-    <text x="540" y="290" font-size="104" font-weight="700" letter-spacing="-2">Rurality.app</text>
-    <text x="540" y="370" font-size="46" font-weight="500" fill="#b8c97a">Rural Classification Tool</text>
-    <text x="540" y="450" font-size="26" font-weight="400" fill="#cfd6bf" opacity="0.85">USDA RUCA &#183; RUCC &#183; Census ACS</text>
+  <!-- Logo tile + brand name -->
+  <g transform="translate(76, 188)">
+    <!-- Logo -->
+    <g transform="scale(1.8)">
+      <rect width="100" height="100" rx="18" fill="#0f2318"/>
+      <path d="M0 82 Q15 68 30 78 Q45 65 60 75 Q75 62 90 72 Q95 76 100 74 L100 100 L0 100 Z" fill="#2d5a3a" opacity="0.7"/>
+      <path d="M0 88 Q20 75 40 84 Q55 72 70 80 Q85 70 100 80 L100 100 L0 100 Z" fill="#3a6b48" opacity="0.6"/>
+      <rect x="12" y="62" width="12" height="20" rx="3" fill="#c4704b"/>
+      <rect x="28" y="48" width="12" height="34" rx="3" fill="#d4a843"/>
+      <rect x="44" y="34" width="12" height="48" rx="3" fill="#b8c97a"/>
+      <rect x="60" y="20" width="12" height="62" rx="3" fill="#7db87d"/>
+      <rect x="76" y="8" width="12" height="74" rx="3" fill="#f0ead6"/>
+    </g>
+
+    <!-- Brand + tagline -->
+    <g transform="translate(220, 0)">
+      <text x="0" y="90" font-family="'Source Serif 4', Georgia, 'Times New Roman', serif" font-size="112" font-weight="500" fill="#f0ead6" letter-spacing="-3">Rurality.app</text>
+      <text x="0" y="170" font-family="'Source Serif 4', Georgia, 'Times New Roman', serif" font-size="44" font-style="italic" fill="#b8c97a" letter-spacing="-1">Really, how rural are you?</text>
+    </g>
   </g>
+
+  <!-- Wheat separator rule -->
+  <line x1="76" y1="452" x2="1124" y2="452" stroke="#d4a843" stroke-opacity="0.55" stroke-width="1.5"/>
+
+  <!-- Stats row: 3 big numerals -->
+  <g transform="translate(76, 492)" font-family="'Source Serif 4', Georgia, serif" fill="#f0ead6">
+    <g>
+      <text x="0" y="48" font-size="68" font-weight="400" letter-spacing="-2" fill="#f0ead6" font-variant-numeric="oldstyle-nums">3,235</text>
+      <text x="0" y="80" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="13" letter-spacing="2.8" fill="#d4a843">U.S. COUNTIES</text>
+    </g>
+    <g transform="translate(360, 0)">
+      <text x="0" y="48" font-size="68" font-weight="400" letter-spacing="-2" fill="#f0ead6" font-variant-numeric="oldstyle-nums">41,146</text>
+      <text x="0" y="80" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="13" letter-spacing="2.8" fill="#d4a843">ZCTAs</text>
+    </g>
+    <g transform="translate(740, 0)">
+      <text x="0" y="48" font-size="68" font-weight="400" letter-spacing="-2" fill="#f0ead6" font-variant-numeric="oldstyle-nums">4</text>
+      <text x="0" y="80" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="13" letter-spacing="2.8" fill="#d4a843">WEIGHTED COMPONENTS</text>
+    </g>
+  </g>
+
+  <!-- Bottom right attribution -->
+  <text x="1124" y="586" text-anchor="end" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="12" letter-spacing="2.4" fill="#d4a843" fill-opacity="0.7">USDA · CENSUS · OPEN ACCESS</text>
 </svg>
