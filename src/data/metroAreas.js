@@ -102,7 +102,35 @@ export const MEDIUM_METROS = [
   { name: "Tuscaloosa, AL", lat: 33.2098, lng: -87.5692, pop: 276678 },
   { name: "Fort Smith, AR", lat: 35.3859, lng: -94.3985, pop: 255435 },
   { name: "Pensacola, FL", lat: 30.4213, lng: -87.2169, pop: 502629 },
-  { name: "Tallahassee, FL", lat: 30.4518, lng: -84.2807, pop: 390560 }
+  { name: "Tallahassee, FL", lat: 30.4518, lng: -84.2807, pop: 390560 },
+  // Previously-missing mid-size MSAs (causing incorrect "far from metro" scores)
+  { name: "Reno, NV", lat: 39.5296, lng: -119.8138, pop: 490596 },
+  { name: "Asheville, NC", lat: 35.5951, lng: -82.5515, pop: 469015 },
+  { name: "Charleston, SC", lat: 32.7765, lng: -79.9311, pop: 816438 },
+  { name: "Wichita, KS", lat: 37.6872, lng: -97.3301, pop: 647610 },
+  { name: "Lexington, KY", lat: 38.0406, lng: -84.5037, pop: 516697 },
+  { name: "Dayton, OH", lat: 39.7589, lng: -84.1916, pop: 814363 },
+  { name: "Toledo, OH", lat: 41.6528, lng: -83.5379, pop: 606240 },
+  { name: "Youngstown, OH", lat: 41.0998, lng: -80.6495, pop: 541243 },
+  { name: "Greensboro, NC", lat: 36.0726, lng: -79.7920, pop: 781315 },
+  { name: "Winston-Salem, NC", lat: 36.0999, lng: -80.2442, pop: 685285 },
+  { name: "Provo, UT", lat: 40.2338, lng: -111.6585, pop: 691165 },
+  { name: "Ogden, UT", lat: 41.2230, lng: -111.9738, pop: 712265 },
+  { name: "Jackson, MS", lat: 32.2988, lng: -90.1848, pop: 596203 },
+  { name: "Shreveport, LA", lat: 32.5252, lng: -93.7502, pop: 393406 },
+  { name: "Lafayette, LA", lat: 30.2241, lng: -92.0198, pop: 478384 },
+  { name: "Killeen, TX", lat: 31.1171, lng: -97.7278, pop: 475367 },
+  { name: "Corpus Christi, TX", lat: 27.8006, lng: -97.3964, pop: 442600 },
+  { name: "Lincoln, NE", lat: 40.8136, lng: -96.7026, pop: 340217 },
+  { name: "Rockford, IL", lat: 42.2711, lng: -89.0940, pop: 338291 },
+  { name: "Peoria, IL", lat: 40.6936, lng: -89.5890, pop: 401370 },
+  { name: "Green Bay, WI", lat: 44.5133, lng: -88.0133, pop: 328268 },
+  { name: "Appleton, WI", lat: 44.2619, lng: -88.4154, pop: 242874 },
+  { name: "Duluth, MN", lat: 46.7867, lng: -92.1005, pop: 288732 },
+  { name: "Rochester, MN", lat: 44.0121, lng: -92.4802, pop: 226329 },
+  { name: "Topeka, KS", lat: 39.0473, lng: -95.6752, pop: 233870 },
+  { name: "Roanoke, VA", lat: 37.2710, lng: -79.9414, pop: 315251 },
+  { name: "Anchorage, AK", lat: 61.2181, lng: -149.9003, pop: 398328 }
 ];
 
 /**
@@ -141,7 +169,16 @@ export const SMALL_METROS = [
   { name: "Burlington, VT", lat: 44.4759, lng: -73.2121, pop: 225562 },
   { name: "Ithaca, NY", lat: 42.4430, lng: -76.5019, pop: 102237 },
   // Texas / Southwest
-  { name: "College Station, TX", lat: 30.6280, lng: -96.3344, pop: 273101 }
+  { name: "College Station, TX", lat: 30.6280, lng: -96.3344, pop: 273101 },
+  { name: "Santa Fe, NM", lat: 35.6870, lng: -105.9378, pop: 155100 },
+  { name: "Cheyenne, WY", lat: 41.1400, lng: -104.8202, pop: 100512 },
+  { name: "Casper, WY", lat: 42.8501, lng: -106.3252, pop: 80081 },
+  { name: "Pocatello, ID", lat: 42.8713, lng: -112.4455, pop: 88306 },
+  { name: "Idaho Falls, ID", lat: 43.4917, lng: -112.0339, pop: 148500 },
+  { name: "Great Falls, MT", lat: 47.4941, lng: -111.3008, pop: 84414 },
+  { name: "Helena, MT", lat: 46.5958, lng: -112.0362, pop: 81327 },
+  { name: "Fairbanks, AK", lat: 64.8378, lng: -147.7164, pop: 95655 },
+  { name: "Juneau, AK", lat: 58.3019, lng: -134.4197, pop: 32255 }
 ];
 
 /**

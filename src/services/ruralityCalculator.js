@@ -150,23 +150,25 @@ export function calculateRuralityScore({
   };
 }
 
+// Density + distance formulas mirror build_county_data.R in the rurality R
+// package so the live site and county_rurality.csv stay in sync. Any change
+// here must update the R script too.
+
 function calcDensityScore(density) {
-  // Curve calibrated for density ≥ 1/sqmi; below that, saturate at 100.
-  // Math.pow(negative, 1.8) returns NaN, which would propagate through the
-  // score for any county with density < 1 (Sandhills, much of MT/NV/WY).
-  if (density <= 1) return 100;
-  // Log-linear curve:
-  // 1/sqmi → 100, 10/sqmi → 78, 50/sqmi → 62, 100/sqmi → 53,
-  // 500/sqmi → 32, 1000/sqmi → 22, 3000/sqmi → 7, 10000+/sqmi → 0
-  const logD = Math.log10(density);
-  const score = 100 - logD * 22 - Math.pow(logD, 1.8) * 3;
+  // R: 100 - log10(pmax(1, density)) * 25
+  // Flooring at 1/sqmi sidesteps NaN from log10(negative) (Math.pow chain)
+  // and gives every sub-1/sqmi county the same max-rural density score.
+  const d = Math.max(1, density);
+  const score = 100 - Math.log10(d) * 25;
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
 function calcDistanceScore(distances) {
-  const large = Math.min(100, distances.largeMetro.distance / 2);
-  const medium = Math.min(100, distances.mediumMetro.distance / 1.5);
-  const small = Math.min(100, distances.smallMetro.distance);
+  // R: score_large = dist/3, score_medium = dist/2, score_small = dist/1
+  // Weighted 0.5 / 0.3 / 0.2.
+  const large  = Math.min(100, distances.largeMetro.distance  / 3);
+  const medium = Math.min(100, distances.mediumMetro.distance / 2);
+  const small  = Math.min(100, distances.smallMetro.distance  / 1);
   return Math.round(Math.max(0, Math.min(100, large * 0.5 + medium * 0.3 + small * 0.2)));
 }
 
