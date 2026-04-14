@@ -2,7 +2,12 @@
  * US Metropolitan Statistical Areas by Population Tier
  * Source: US Census Bureau, 2020 Census
  *
- * Used to calculate distance to nearest urban center of various sizes
+ * Used to calculate distance to nearest urban center of various sizes.
+ *
+ * SINGLE SOURCE OF TRUTH: the arrays below mirror public/data/metros.json,
+ * which the R package's build_county_data.R reads to generate
+ * county_rurality.csv. When adding/editing a metro here, regenerate the
+ * JSON via scripts/export-metros.js so the R pipeline stays in sync.
  */
 
 /**
