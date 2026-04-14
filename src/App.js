@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
-  Navigation, Info, Download, Share2, Zap, Wifi,
-  Building2, Tractor, Heart, DollarSign, AlertCircle,
+  Navigation, Info, Download, Share2, Zap,
+  Building2, DollarSign, AlertCircle,
   BookOpen, FlaskConical, ExternalLink, Database, Calculator
 } from 'lucide-react';
 
@@ -54,28 +54,6 @@ function getRUCAColor(code) {
 function buildRuralityDataForUI(calcResult, censusData) {
   const { overallScore, classification, components, confidence, methodology } = calcResult;
   const popDensity = components.populationDensity.value;
-  const rucaCode = components.ruca?.code ?? null;
-
-  // Agricultural land: estimated from RUCA code; fallback from score
-  const agLand = rucaCode !== null
-    ? Math.round(Math.max(5, Math.min(85, 50 + (rucaCode - 5) * 5)))
-    : Math.round(Math.max(5, Math.min(85, overallScore * 0.8)));
-
-  // Internet access: inversely correlated with rurality
-  const internetAccess = rucaCode !== null
-    ? Math.round(Math.max(40, Math.min(95, 77 - (rucaCode - 1) * 5)))
-    : Math.round(Math.max(40, Math.min(95, 92 - overallScore * 0.4)));
-
-  // Healthcare density: rough proxy from population density
-  const healthcareDensity = parseFloat(
-    Math.max(0.3, Math.min(8, popDensity / 500)).toFixed(1)
-  );
-
-  // Economic diversity: based on unemployment rate
-  const unemploymentRate = censusData.unemploymentRate || 4.5;
-  const economicDiversity = parseFloat(
-    Math.max(1, Math.min(10, 7 - (unemploymentRate - 4) * 0.3)).toFixed(1)
-  );
 
   // Report distance to the nearest metro of any tier — otherwise a
   // location inside a medium/large metro (e.g., Fresno) would display the
@@ -102,41 +80,13 @@ function buildRuralityDataForUI(calcResult, censusData) {
         score: components.distance.score,
         label: 'Distance to Urban Center (mi)',
         icon: MapPin
-      },
-      // The four tiles below are model-derived proxies, not measurements:
-      // ag-land and broadband are functions of the RUCA code; healthcare
-      // density is a function of population density; economic diversity
-      // is derived from the ACS unemployment rate. They're flagged
-      // `estimated: true` so the UI can badge them and researchers don't
-      // mistake them for FCC, USDA Census of Agriculture, or HRSA data.
-      agriculturalLand: {
-        value: agLand,
-        score: agLand,
-        label: 'Agricultural Land Use (est. %)',
-        icon: Tractor,
-        estimated: true
-      },
-      internetAccess: {
-        value: internetAccess,
-        score: Math.round(100 - internetAccess),
-        label: 'Broadband Access (est. %)',
-        icon: Wifi,
-        estimated: true
-      },
-      healthcareDensity: {
-        value: healthcareDensity,
-        score: Math.round((1 - healthcareDensity / 8) * 100),
-        label: 'Healthcare Facilities (est. per 1000)',
-        icon: Heart,
-        estimated: true
-      },
-      economicDiversity: {
-        value: economicDiversity,
-        score: Math.round((1 - economicDiversity / 10) * 100),
-        label: 'Economic Diversity Index (est.)',
-        icon: DollarSign,
-        estimated: true
       }
+      // Agricultural land, broadband access, healthcare facility density,
+      // and economic diversity used to appear here as proxy tiles derived
+      // from RUCA / density / unemployment. They were removed because
+      // they looked like measurements but weren't — see README roadmap
+      // for the FCC / USDA Census of Ag / HRSA integrations that will
+      // replace them with real data.
     },
     demographics: {
       population: censusData.totalPopulation,
