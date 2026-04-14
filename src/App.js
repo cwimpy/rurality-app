@@ -77,7 +77,14 @@ function buildRuralityDataForUI(calcResult, censusData) {
     Math.max(1, Math.min(10, 7 - (unemploymentRate - 4) * 0.3)).toFixed(1)
   );
 
-  const distanceMiles = Math.round(components.distance.nearestSmallMetro);
+  // Report distance to the nearest metro of any tier — otherwise a
+  // location inside a medium/large metro (e.g., Fresno) would display the
+  // distance to the nearest *small* metro, which can be hundreds of miles.
+  const distanceMiles = Math.round(Math.min(
+    components.distance.nearestLargeMetro,
+    components.distance.nearestMediumMetro,
+    components.distance.nearestSmallMetro
+  ));
 
   return {
     overallScore,

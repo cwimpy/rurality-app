@@ -152,7 +152,14 @@ export default function StateMap({ onLocationSearch }) {
 
   const handleCountyClick = useCallback((f) => {
     if (onLocationSearch && f.properties.countyName) {
-      onLocationSearch(f.properties.countyName + ' County');
+      // Include state so Nominatim doesn't resolve to a same-named
+      // county in another state (e.g., "Grant County" → Grant, WI).
+      const stateFips = String(f.properties.fips).slice(0, 2);
+      const stateName = US_STATES.find(s => s.fips === stateFips)?.name;
+      const query = stateName
+        ? `${f.properties.countyName} County, ${stateName}`
+        : `${f.properties.countyName} County`;
+      onLocationSearch(query);
     }
   }, [onLocationSearch]);
 
