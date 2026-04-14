@@ -151,11 +151,15 @@ export function calculateRuralityScore({
 }
 
 function calcDensityScore(density) {
-  if (density <= 0) return 100;
-  // Log-linear curve calibrated for U.S. county density range:
+  // Curve calibrated for density ≥ 1/sqmi; below that, saturate at 100.
+  // Math.pow(negative, 1.8) returns NaN, which would propagate through the
+  // score for any county with density < 1 (Sandhills, much of MT/NV/WY).
+  if (density <= 1) return 100;
+  // Log-linear curve:
   // 1/sqmi → 100, 10/sqmi → 78, 50/sqmi → 62, 100/sqmi → 53,
   // 500/sqmi → 32, 1000/sqmi → 22, 3000/sqmi → 7, 10000+/sqmi → 0
-  const score = 100 - Math.log10(density) * 22 - Math.pow(Math.log10(density), 1.8) * 3;
+  const logD = Math.log10(density);
+  const score = 100 - logD * 22 - Math.pow(logD, 1.8) * 3;
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 

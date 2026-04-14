@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Download, AlertCircle, CheckCircle, Loader, X } from 'lucide-react';
 import { geocodeWithCache, fetchCensusData, getCountyFromCoordinates } from '../utils/apiUtils';
 import { calculateRuralityScore } from '../services/ruralityCalculator';
-import { getRUCAForZcta } from '../data/rucaZcta';
+import { getRUCAForZcta, loadRucaData } from '../data/rucaZcta';
 import { getRUCC } from '../data/ruralUrbanCodes';
 
 const tierColor = (score) =>
@@ -105,6 +105,9 @@ export default function BatchLookup() {
     abortRef.current = false;
     const out = [];
 
+    // RUCA table must be loaded before getRUCAForZcta can return a code.
+    await loadRucaData().catch(() => {});
+
     for (let i = 0; i < locations.length; i++) {
       if (abortRef.current) break;
       const loc = locations[i];
@@ -115,16 +118,26 @@ export default function BatchLookup() {
         const county = await getCountyFromCoordinates(geo.lat, geo.lng);
         const census = await fetchCensusData(county.stateFips, county.countyFips);
         const zip = geo.postcode?.slice(0, 5);
-        const ruca = zip ? await getRUCAForZcta(zip) : null;
+        const ruca = zip ? getRUCAForZcta(zip) : null;
         const rucc = getRUCC(county.stateFips, county.countyFips);
 
+        const populationDensity = county.areaSqMiles > 0
+          ? census.totalPopulation / county.areaSqMiles
+          : 0;
+
         const calc = calculateRuralityScore({
-          latitude: geo.lat,
-          longitude: geo.lng,
-          populationDensity: census.totalPopulation / county.areaSqMiles,
-          rucaCode: ruca,
+          lat: geo.lat,
+          lng: geo.lng,
+          populationDensity,
+          ruca,
           broadbandAccess: null,
         });
+
+        const nearestMetroMi = Math.round(Math.min(
+          calc.components.distance.nearestLargeMetro,
+          calc.components.distance.nearestMediumMetro,
+          calc.components.distance.nearestSmallMetro
+        ));
 
         out.push({
           location: loc,
@@ -136,8 +149,8 @@ export default function BatchLookup() {
             stateFips: county.stateFips,
             countyFips: county.countyFips,
             rucc,
-            density: Math.round(census.totalPopulation / county.areaSqMiles),
-            distanceMi: Math.round(calc.components.distance.nearestSmallMetro),
+            density: Math.round(populationDensity),
+            distanceMi: nearestMetroMi,
           },
         });
       } catch (err) {

@@ -209,12 +209,15 @@ const RuralityApp = () => {
       const populationDensity = countyData.areaSqMiles > 0
         ? censusData.totalPopulation / countyData.areaSqMiles
         : 0;
+
+      // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
+      // return a code (both are sync and silently return null if not loaded).
+      await Promise.all([loadRucaData(), loadRuccData()]);
+
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca });
 
       setLoadingStep('Building analysis…');
-      // Ensure lookup tables are loaded (no-op if already in memory)
-      await Promise.all([loadRucaData(), loadRuccData()]);
 
       const uiData = buildRuralityDataForUI(calcResult, censusData);
 
@@ -311,16 +314,24 @@ const RuralityApp = () => {
       (position) => {
         const { latitude, longitude } = position.coords;
         fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${latitude}&lon=${longitude}`
         )
           .then((r) => r.json())
           .then((data) => {
             const name =
               data.address?.city ||
               data.address?.town ||
+              data.address?.village ||
+              data.address?.hamlet ||
               data.address?.county ||
               'Current Location';
-            return handleLocationSearch(name).catch(() => {});
+            // Append state so same-named places don't resolve to another state
+            // via the forward geocode inside handleLocationSearch.
+            const state = data.address?.state;
+            const query = state && name !== 'Current Location'
+              ? `${name}, ${state}`
+              : name;
+            return handleLocationSearch(query).catch(() => {});
           })
           .catch(() => {
             setError('Failed to identify current location');
@@ -378,7 +389,11 @@ const RuralityApp = () => {
               name: locationName, score: overallScore, level: classification.label, loading: false,
               rucc,
               density: populationDensity,
-              distanceToMetro: components.distance.nearestSmallMetro,
+              distanceToMetro: Math.min(
+                components.distance.nearestLargeMetro,
+                components.distance.nearestMediumMetro,
+                components.distance.nearestSmallMetro
+              ),
               ruccScore: components.ruca?.score ?? null,
               densityScore: components.populationDensity.score,
               distanceScore: components.distance.score
