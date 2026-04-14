@@ -196,15 +196,21 @@ export async function fetchCensusData(stateFips, countyFips) {
   }
 
   const values = data[1];
+  const laborForce = parseInt(values[4]) || 0;
+  const unemployed = parseInt(values[5]) || 0;
   const result = {
     totalPopulation: parseInt(values[0]) || 0,
     medianIncome: parseInt(values[1]) || 0,
     housingUnits: parseInt(values[2]) || 0,
     commuteTime: parseFloat(values[3]) || 0,
-    laborForce: parseInt(values[4]) || 0,
-    unemployed: parseInt(values[5]) || 0,
+    laborForce,
+    unemployed,
     medianAge: parseFloat(values[6]) || 0,
-    unemploymentRate: values[4] > 0 ? parseFloat(((values[5] / values[4]) * 100).toFixed(1)) : 0
+    // Use parsed numbers — the raw strings can be null for disclosure-
+    // suppressed tracts, which would otherwise yield NaN% in the UI.
+    unemploymentRate: laborForce > 0
+      ? parseFloat(((unemployed / laborForce) * 100).toFixed(1))
+      : 0
   };
 
   censusCache.set(cacheKey, result);
@@ -229,10 +235,12 @@ export async function getCountyFromCoordinates(lat, lng) {
   }
 
   const r = fccData.results[0];
-  const stateFips = String(r.state_fips || '');
-  // FCC county_fips may be 5-digit (state+county) — extract last 3
-  const rawFips = String(r.county_fips || '');
-  const countyFips = rawFips.length === 5 ? rawFips.slice(2) : rawFips.padStart(3, '0');
+  const stateFips = String(r.state_fips || '').padStart(2, '0');
+  // FCC county_fips is usually 5 chars (state+county) but can occasionally
+  // come back without leading zeros (e.g., "2013" for 02013 in AK). Normalize
+  // by padding to 5 and taking the last 3 — that matches rucc.json keys.
+  const rawFips = String(r.county_fips || '').padStart(5, '0');
+  const countyFips = rawFips.slice(-3);
   const countyName = r.county_name || '';
 
   // ── Land area from Census TIGER (CORS-friendly) ─────────────────────────

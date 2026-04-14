@@ -17,16 +17,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Handles quoted fields with embedded commas ("Travis County, TX") and
+// doubled-quote escapes (""") within a quoted field. Plain split(',') would
+// truncate any row whose location string contains a comma.
+function parseCSVLine(line) {
+  const out = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      out.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
 function parseCSV(text) {
-  const lines = text.trim().split('\n');
+  const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
-  const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/"/g, ''));
+  const header = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
   const locCol = header.findIndex((h) =>
     ['location', 'address', 'place', 'city', 'zip', 'zipcode', 'zip_code', 'name'].includes(h)
   );
   if (locCol === -1) return null;
   return lines.slice(1)
-    .map((line) => line.split(',').map((c) => c.trim().replace(/"/g, '')))
+    .map((line) => parseCSVLine(line).map((c) => c.trim()))
     .filter((cols) => cols[locCol]?.trim())
     .map((cols) => cols[locCol].trim());
 }
@@ -42,7 +65,10 @@ function exportResultsCSV(results) {
       d.rucc ?? '', d.density ?? '', d.distanceMi ?? '', 'OK',
     ];
   });
-  const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${v}"`).join(','))].join('\n');
+  // Double-quote any " in values so CSV consumers (Excel, R, pandas) parse
+  // quoted fields correctly — error messages can contain quotes.
+  const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.join(','), ...rows.map((r) => r.map(csvCell).join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

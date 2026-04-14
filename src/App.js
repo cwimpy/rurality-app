@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap,
@@ -119,6 +119,12 @@ const RuralityApp = () => {
     catch { return []; }
   });
 
+  // Monotonically-increasing search id. Each search captures its id at the
+  // start; when it resolves, we drop the result if a newer search has begun.
+  // Prevents a slow search from overwriting a faster one that the user
+  // kicked off afterward.
+  const searchIdRef = useRef(0);
+
   // Preload lookup tables in the background immediately on mount.
   useEffect(() => {
     loadRucaData().catch(() => {});
@@ -152,6 +158,11 @@ const RuralityApp = () => {
   // ── Location search ────────────────────────────────────────────────────────
   const handleLocationSearch = async (location) => {
     if (!location.trim()) return;
+    // Capture this search's id; later async steps bail out if the ref has
+    // moved on, so a stale search can't stomp a newer one's results.
+    const mySearchId = ++searchIdRef.current;
+    const isStale = () => searchIdRef.current !== mySearchId;
+
     setLoading(true);
     setError('');
     setTrendsData(null); // clear stale trends on new search
@@ -159,12 +170,15 @@ const RuralityApp = () => {
     try {
       setLoadingStep('Step 1/3: Geocoding location…');
       const geoData = await geocodeWithCache(location);
+      if (isStale()) return;
 
       setLoadingStep('Step 2/3: Looking up county…');
       const countyData = await getCountyFromCoordinates(geoData.lat, geoData.lng);
+      if (isStale()) return;
 
       setLoadingStep('Step 3/3: Fetching Census data…');
       const censusData = await fetchCensusData(countyData.stateFips, countyData.countyFips);
+      if (isStale()) return;
 
       const populationDensity = countyData.areaSqMiles > 0
         ? censusData.totalPopulation / countyData.areaSqMiles
@@ -173,6 +187,7 @@ const RuralityApp = () => {
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
       await Promise.all([loadRucaData(), loadRuccData()]);
+      if (isStale()) return;
 
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca });
@@ -238,11 +253,19 @@ const RuralityApp = () => {
         coordinates: { lat: geoData.lat, lng: geoData.lng }
       });
     } catch (err) {
+      if (isStale()) return;
+      // Clear stale dashboard so the user doesn't see the previous
+      // location's metrics sitting under an error banner.
+      setRuralityData(null);
+      setLocationMeta(null);
+      setCurrentLocation('');
       setError(err.message || 'Location lookup failed. Try a more specific search.');
       console.error('Search error:', err);
     } finally {
-      setLoading(false);
-      setLoadingStep('');
+      if (!isStale()) {
+        setLoading(false);
+        setLoadingStep('');
+      }
     }
   };
 
@@ -428,7 +451,8 @@ const RuralityApp = () => {
       ['Unemployment Rate', ruralityData.demographics?.unemploymentRate
         ? `${ruralityData.demographics.unemploymentRate}%` : 'N/A', '']
     ];
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -441,6 +465,11 @@ const RuralityApp = () => {
 
   const printReport = () => {
     if (!ruralityData || !currentLocation) return;
+    // currentLocation comes from Nominatim, which reflects user-supplied
+    // query text. Escape before interpolating into the print template.
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
     const level = getRuralityLevel(ruralityData.overallScore);
     const demo = ruralityData.demographics;
     const score = ruralityData.overallScore;
@@ -492,7 +521,7 @@ const RuralityApp = () => {
 
     const html = `<!DOCTYPE html><html><head>
 <meta charset="utf-8">
-<title>Field Report — ${currentLocation}</title>
+<title>Field Report — ${esc(currentLocation)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -742,7 +771,7 @@ const RuralityApp = () => {
   <div class="masthead">
     <div>
       <div class="kicker">A Rurality Index Report</div>
-      <h1>${currentLocation}</h1>
+      <h1>${esc(currentLocation)}</h1>
       <div class="meta">Confidence &middot; <em style="font-family:'Source Serif 4',serif;font-style:italic;text-transform:none;letter-spacing:0;">${ruralityData.confidence}</em></div>
     </div>
     <div class="stamp-block">
