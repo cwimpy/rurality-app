@@ -8,6 +8,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "caniuse-lite": "^1.0.30001788",
     "d3-geo": "^3.1.1",
     "d3-scale": "^4.0.2",
     "leaflet": "^1.9.4",

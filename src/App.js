@@ -103,29 +103,39 @@ function buildRuralityDataForUI(calcResult, censusData) {
         label: 'Distance to Urban Center (mi)',
         icon: MapPin
       },
+      // The four tiles below are model-derived proxies, not measurements:
+      // ag-land and broadband are functions of the RUCA code; healthcare
+      // density is a function of population density; economic diversity
+      // is derived from the ACS unemployment rate. They're flagged
+      // `estimated: true` so the UI can badge them and researchers don't
+      // mistake them for FCC, USDA Census of Agriculture, or HRSA data.
       agriculturalLand: {
         value: agLand,
         score: agLand,
-        label: 'Agricultural Land Use (%)',
-        icon: Tractor
+        label: 'Agricultural Land Use (est. %)',
+        icon: Tractor,
+        estimated: true
       },
       internetAccess: {
         value: internetAccess,
         score: Math.round(100 - internetAccess),
-        label: 'Broadband Access (%)',
-        icon: Wifi
+        label: 'Broadband Access (est. %)',
+        icon: Wifi,
+        estimated: true
       },
       healthcareDensity: {
         value: healthcareDensity,
         score: Math.round((1 - healthcareDensity / 8) * 100),
-        label: 'Healthcare Facilities (per 1000)',
-        icon: Heart
+        label: 'Healthcare Facilities (est. per 1000)',
+        icon: Heart,
+        estimated: true
       },
       economicDiversity: {
         value: economicDiversity,
         score: Math.round((1 - economicDiversity / 10) * 100),
-        label: 'Economic Diversity Index',
-        icon: DollarSign
+        label: 'Economic Diversity Index (est.)',
+        icon: DollarSign,
+        estimated: true
       }
     },
     demographics: {
@@ -2761,7 +2771,13 @@ your_data <- your_data |>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Icon className="w-3.5 h-3.5" style={{ color: 'var(--color-ink-muted)' }} />
-                          <span className="text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                          <span
+                            className="text-[0.65rem] uppercase tracking-[0.22em] font-mono"
+                            style={{ color: 'var(--color-ink-muted)' }}
+                            title={metric.estimated
+                              ? 'Derived proxy, not a direct measurement. See Methodology.'
+                              : undefined}
+                          >
                             {metric.label}
                           </span>
                         </div>
