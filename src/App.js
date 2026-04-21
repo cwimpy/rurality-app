@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap,
-  Building2, DollarSign, AlertCircle,
+  Building2, DollarSign, AlertCircle, Wifi,
   BookOpen, FlaskConical, ExternalLink, Database, Calculator
 } from 'lucide-react';
 
@@ -27,6 +27,7 @@ import {
 import { calculateRuralityScore } from './services/ruralityCalculator';
 import { loadRucaData, getRUCAForZcta, getRUCADescription, rucaToScore } from './data/rucaZcta';
 import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/ruralUrbanCodes';
+import { loadBroadbandData, getBroadband } from './data/broadband';
 
 // ── Official classification helpers ──────────────────────────────────────────
 function getOMBDesignation(rucc) {
@@ -69,6 +70,17 @@ function buildRuralityDataForUI(calcResult, censusData) {
     classification,
     confidence,
     metrics: {
+      // Tile order mirrors weight order in the full-data scenario:
+      // RUCA 50% · Density 25% · Distance 15% · Broadband 10%.
+      // Each tile only appears when its component is present.
+      ...(components.ruca ? {
+        ruca: {
+          value: components.ruca.code,
+          score: components.ruca.score,
+          label: 'RUCA Code',
+          icon: BarChart3
+        }
+      } : {}),
       populationDensity: {
         value: Math.round(popDensity),
         score: components.populationDensity.score,
@@ -80,13 +92,21 @@ function buildRuralityDataForUI(calcResult, censusData) {
         score: components.distance.score,
         label: 'Distance to Urban Center (mi)',
         icon: MapPin
-      }
-      // Agricultural land, broadband access, healthcare facility density,
-      // and economic diversity used to appear here as proxy tiles derived
-      // from RUCA / density / unemployment. They were removed because
-      // they looked like measurements but weren't — see README roadmap
-      // for the FCC / USDA Census of Ag / HRSA integrations that will
-      // replace them with real data.
+      },
+      ...(components.broadband ? {
+        broadband: {
+          value: Math.round(components.broadband.access),
+          score: components.broadband.score,
+          label: 'Broadband Served (≥100/20 Mbps)',
+          icon: Wifi
+        }
+      } : {})
+      // Agricultural land, healthcare facility density, and economic
+      // diversity used to appear here as proxy tiles derived from RUCA
+      // / density / unemployment. They were removed because they looked
+      // like measurements but weren't — see README roadmap for the
+      // USDA Census of Ag / HRSA integrations that will replace them
+      // with real data.
     },
     demographics: {
       population: censusData.totalPopulation,
@@ -129,6 +149,7 @@ const RuralityApp = () => {
   useEffect(() => {
     loadRucaData().catch(() => {});
     loadRuccData().catch(() => {});
+    loadBroadbandData().catch(() => {});
   }, []);
 
 
@@ -186,11 +207,12 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      await Promise.all([loadRucaData(), loadRuccData()]);
+      await Promise.all([loadRucaData(), loadRuccData(), loadBroadbandData()]);
       if (isStale()) return;
 
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
-      const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca });
+      const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
+      const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
       setLoadingStep('Building analysis…');
 
@@ -356,14 +378,15 @@ const RuralityApp = () => {
     setComparisonData(prev => [...prev, { name: locationName, score: null, level: null, loading: true }]);
 
     try {
-      await loadRucaData();
+      await Promise.all([loadRucaData(), loadBroadbandData()]);
       const geoData = await geocodeWithCache(locationName);
       const countyData = await getCountyFromCoordinates(geoData.lat, geoData.lng);
       const censusData = await fetchCensusData(countyData.stateFips, countyData.countyFips);
       const populationDensity = countyData.areaSqMiles > 0
         ? censusData.totalPopulation / countyData.areaSqMiles : 0;
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
-      const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca });
+      const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
+      const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
       const { overallScore, classification, components } = calcResult;
       const rucc = getRUCC(countyData.stateFips, countyData.countyFips);
       setComparisonData(prev => prev.map(d =>
@@ -1299,6 +1322,7 @@ const RuralityApp = () => {
       { n: '04', name: 'Census Geocoder API',                             vintage: 'live', scale: 'service',           detail: 'Coordinate → county FIPS + land area for density', url: 'https://geocoding.geo.census.gov/' },
       { n: '05', name: 'OpenStreetMap / Nominatim',                       vintage: 'live', scale: 'service',           detail: 'Forward/reverse geocoding, rate-limited',          url: 'https://nominatim.openstreetmap.org/' },
       { n: '06', name: 'FCC Census Area API',                             vintage: 'live', scale: 'fallback',          detail: 'County FIPS lookup when Census Geocoder is down',  url: 'https://geo.fcc.gov/api/census/' },
+      { n: '07', name: 'FCC Broadband Data Collection (BDC)',             vintage: 'Jun 2025', scale: '3,232 counties', detail: '% locations served at 100/20 Mbps (wired + licensed FW)', url: 'https://broadbandmap.fcc.gov/data-download/nationwide-data' },
     ];
 
     const limitations = [
@@ -1307,7 +1331,7 @@ const RuralityApp = () => {
       'The composite Rurality Index is a research tool, not an official federal designation. It should complement, not replace, official classifications for regulatory or funding purposes.',
       'RUCA is only available for ZIPs that appear in the USDA ZCTA file. Some ZIP codes (PO boxes, unique ZIPs) are not included.',
       'Distance-to-metro scores use a fixed list of large, medium, and small metro areas. Commuting patterns in border regions may not be fully captured.',
-      'Broadband data is not yet incorporated in the live scoring; the weight redistributes to density and distance when broadband data is unavailable.',
+      'Broadband coverage uses FCC BDC (June 2025 filing) at the 100/20 Mbps threshold, restricted to wired and licensed fixed wireless technologies — satellite and unlicensed fixed wireless are excluded to match the BEAD-eligibility footprint. Measures availability, not adoption. When broadband data is unavailable for a county, the weight redistributes to density and distance.',
       'County counts vary by source. USDA ERS RUCC 2023 covers 3,233 counties; the app\u2019s working total of 3,235 includes county-equivalent jurisdictions such as Louisiana parishes, Alaska boroughs and census areas, Virginia independent cities, and the District of Columbia. Census ACS vintages land near 3,143. Totals will not match every federal source exactly.',
     ];
 
@@ -1585,6 +1609,7 @@ const RuralityApp = () => {
       { n: '03', citation: 'Cromartie, J., & Bucholtz, S. (2008). Defining the “rural” in rural America. Amber Waves, 6(3), 28–34. USDA ERS.', url: null },
       { n: '04', citation: 'Hart, L. G., Larson, E. H., & Lishner, D. M. (2005). Rural definitions for health policy and research. American Journal of Public Health, 95(7), 1149–1155.', url: null },
       { n: '05', citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan, micropolitan, and combined statistical areas.', url: null },
+      { n: '06', citation: 'Federal Communications Commission. (2025). Broadband Data Collection — National Broadband Map (J25 filing, June 2025).', url: 'https://broadbandmap.fcc.gov/data-download/nationwide-data' },
     ];
 
     const Chapter = ({ num, kicker, title, children }) => (
@@ -1841,6 +1866,60 @@ const RuralityApp = () => {
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 italic">
             Summed across tiers and clamped to [0, 100]. Coordinates resolved via Census Geocoder or Nominatim.
+          </p>
+        </Chapter>
+
+        {/* ── §6 Components — Broadband ────────────────────────────── */}
+        <Chapter num="05" kicker="Component · County-level" title={<>Broadband <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>availability</em>.</>}>
+          <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Broadband infrastructure is treated as a structural feature of place, not a behavioral
+            outcome. The metric is the percent of residential broadband-serviceable locations in a
+            county with at least one provider offering service at or above 100&nbsp;Mbps download
+            and 20&nbsp;Mbps upload &mdash; the federal benchmark used for BEAD-program
+            eligibility. Source: FCC&nbsp;Broadband&nbsp;Data&nbsp;Collection (J25 filing,
+            June&nbsp;2025).
+          </p>
+
+          <div className="space-y-3">
+            {[
+              { label: 'Threshold',     value: '≥ 100 / 20 Mbps',                  detail: 'Down/up speeds; matches the federal BEAD benchmark', color: '#1a3a2a' },
+              { label: 'Technologies',  value: 'Wired + licensed fixed wireless',  detail: 'Cable, fiber, DSL, copper, licensed FW',             color: '#4a7c59' },
+              { label: 'Excluded',      value: 'Satellite, unlicensed FW',         detail: 'Starlink/HughesNet wash out rural signal; ULFW unreliable', color: '#a17321' },
+              { label: 'Construct',     value: 'Availability, not adoption',       detail: 'Whether service exists, not whether households subscribe',  color: '#d4a843' },
+            ].map(({ label, value, detail, color }) => (
+              <div key={label} className="flex items-center gap-4 rounded-lg px-4 py-3 border border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+                   style={{ backgroundColor: 'var(--color-cream)' }}>
+                <div className="w-3 h-12 rounded-sm" style={{ backgroundColor: color }} />
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-3">
+                    <span className="fg-display text-lg" style={{ color: 'var(--color-ink)' }}>{label}</span>
+                    <span className="text-sm" style={{ color: 'var(--color-ink-muted)' }}>{value}</span>
+                  </div>
+                  <div className="font-mono text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    {detail}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
+               style={{ backgroundColor: 'var(--color-cream)' }}>
+            <div className="px-4 py-2 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.28em] font-mono border-b border-[rgba(26,58,42,0.12)] dark:border-[rgba(255,255,255,0.08)]"
+                 style={{ color: 'var(--color-ink-muted)' }}>
+              <span>Exhibit · Score formula</span>
+              <span>Score out of 100</span>
+            </div>
+            <div className="px-4 py-4 font-mono text-sm text-slate-700 dark:text-slate-300">
+              broadband_score = 100 &minus; served_pct
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+            Higher coverage produces a lower rurality contribution; the inversion keeps every
+            component on the same urban&nbsp;→&nbsp;rural axis. Joined by 5-digit county FIPS;
+            covers 3,232 of 3,235 county-equivalent jurisdictions. When unavailable, the 10%
+            broadband weight redistributes to density and distance per &sect;1.
           </p>
         </Chapter>
 

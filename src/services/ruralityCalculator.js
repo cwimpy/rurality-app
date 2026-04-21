@@ -5,7 +5,7 @@
  *   RUCA code          50%  — USDA gold standard commuting-area classification
  *   Population density 25%  — Census ACS
  *   Distance to metro  15%  — Haversine to nearest metro tier
- *   Broadband access   10%  — FCC / NTIA (when available)
+ *   Broadband access   10%  — FCC BDC, % locations served at 100/20 Mbps
  *
  * RUCA only (confidence: medium-high):
  *   RUCA 55%, Density 25%, Distance 20%
@@ -143,7 +143,7 @@ export function calculateRuralityScore({
         'USDA ERS Rural-Urban Commuting Area Codes (RUCA 2020)',
         'US Census Bureau ACS 5-Year (2022)',
         'Census TIGER/Line for county land area',
-        ...(broadbandAccess !== null ? ['FCC Broadband Data'] : [])
+        ...(broadbandAccess !== null ? ['FCC Broadband Data Collection (BDC) — June 2025 filing'] : [])
       ],
       weights
     }

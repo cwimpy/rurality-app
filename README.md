@@ -95,7 +95,7 @@ REACT_APP_GOOGLE_PLACES_KEY=your_google_places_key
 - **USDA Economic Research Service** - Rural-Urban Continuum Codes (2013)
 - **US Census Bureau API** - Population and demographic data (2022)
 - **US Census Bureau** - Metropolitan Statistical Areas (2020)
-- **FCC Broadband Data** - Internet access statistics (when available)
+- **FCC Broadband Data Collection** - County-level coverage at ≥100/20 Mbps (J25 filing, June 2025)
 - **OpenStreetMap Nominatim** - Free geocoding service
 
 All sources are cited in [METHODOLOGY.md](METHODOLOGY.md)
@@ -227,7 +227,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - [x] US Census Bureau API integration
 - [x] Evidence-based calculation methodology
 - [ ] Complete RUCC database (all 3,142 counties)
-- [ ] FCC broadband API integration
+- [x] FCC broadband integration (BDC, ≥100/20 Mbps, county-level)
 - [ ] Historical trend data collection
 
 ### Phase 3: Advanced Features 📋

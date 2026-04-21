@@ -4,6 +4,7 @@ import { geocodeWithCache, fetchCensusData, getCountyFromCoordinates } from '../
 import { calculateRuralityScore } from '../services/ruralityCalculator';
 import { getRUCAForZcta, loadRucaData } from '../data/rucaZcta';
 import { getRUCC } from '../data/ruralUrbanCodes';
+import { loadBroadbandData, getBroadband } from '../data/broadband';
 
 const tierColor = (score) =>
   score == null ? 'var(--color-ink-muted)' :
@@ -131,8 +132,12 @@ export default function BatchLookup() {
     abortRef.current = false;
     const out = [];
 
-    // RUCA table must be loaded before getRUCAForZcta can return a code.
-    await loadRucaData().catch(() => {});
+    // Lookup tables must be loaded before getRUCAForZcta / getBroadband
+    // can return a value (both are sync and silently return null if unloaded).
+    await Promise.all([
+      loadRucaData().catch(() => {}),
+      loadBroadbandData().catch(() => {}),
+    ]);
 
     for (let i = 0; i < locations.length; i++) {
       if (abortRef.current) break;
@@ -156,7 +161,7 @@ export default function BatchLookup() {
           lng: geo.lng,
           populationDensity,
           ruca,
-          broadbandAccess: null,
+          broadbandAccess: getBroadband(county.stateFips, county.countyFips),
         });
 
         const nearestMetroMi = Math.round(Math.min(
