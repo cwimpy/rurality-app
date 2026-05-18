@@ -73,9 +73,30 @@ const nominatimRateLimiter = new APIRateLimiter(1, 1000); // 1 request per secon
 const geocodeCache = new APICache(3600000); // 1 hour
 const censusCache = new APICache(86400000); // 24 hours
 
+// Census redirects keyless requests to an HTML "missing key" page whose
+// response has no CORS headers, so fetch() rejects with a generic TypeError
+// before we can read a status. Catch that case at the URL level and fail
+// fast with a useful message instead of three pointless retries.
+function diagnoseFetchError(url, error) {
+  const isCensus = /(^|\.)api\.census\.gov$/.test(new URL(url, 'https://x').hostname);
+  const hasKey = /[?&]key=/.test(url);
+  if (isCensus && !hasKey) {
+    return new Error(
+      'Census API key missing or invalid. Set REACT_APP_CENSUS_API_KEY in the build environment.'
+    );
+  }
+  return error;
+}
+
 // Enhanced fetch with retry logic
 export async function fetchWithRetry(url, options = {}, maxRetries = 3) {
   let lastError;
+
+  // Skip retries for unrecoverable configuration errors
+  const isCensus = /(^|\.)api\.census\.gov$/.test(new URL(url, 'https://x').hostname);
+  if (isCensus && !/[?&]key=/.test(url)) {
+    throw diagnoseFetchError(url, null);
+  }
 
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -98,7 +119,7 @@ export async function fetchWithRetry(url, options = {}, maxRetries = 3) {
     }
   }
 
-  throw new Error(`Failed after ${maxRetries} attempts: ${lastError.message}`);
+  throw diagnoseFetchError(url, new Error(`Failed after ${maxRetries} attempts: ${lastError.message}`));
 }
 
 // Geocoding with rate limiting and caching
