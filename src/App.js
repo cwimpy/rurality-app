@@ -474,7 +474,11 @@ const RuralityApp = () => {
       ['Unemployment Rate', ruralityData.demographics?.unemploymentRate
         ? `${ruralityData.demographics.unemploymentRate}%` : 'N/A', '']
     ];
-    const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csvCell = (v) => {
+      let s = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
     const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -484,6 +488,7 @@ const RuralityApp = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
   };
 
   const printReport = () => {

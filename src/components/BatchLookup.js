@@ -67,8 +67,14 @@ function exportResultsCSV(results) {
     ];
   });
   // Double-quote any " in values so CSV consumers (Excel, R, pandas) parse
-  // quoted fields correctly — error messages can contain quotes.
-  const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // quoted fields correctly — error messages can contain quotes. Prefix any
+  // cell starting with =, +, -, @, tab, or CR with a single quote so Excel
+  // and Sheets treat it as text instead of evaluating it as a formula.
+  const csvCell = (v) => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return `"${s.replace(/"/g, '""')}"`;
+  };
   const csv = [headers.join(','), ...rows.map((r) => r.map(csvCell).join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

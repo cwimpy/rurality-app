@@ -22,7 +22,8 @@ export function loadBroadbandData() {
       if (!r.ok) throw new Error(`Failed to load broadband data (${r.status})`);
       return r.json();
     })
-    .then(d => { _data = d; _loadPromise = null; });
+    .then(d => { _data = d; _loadPromise = null; })
+    .catch(err => { _loadPromise = null; throw err; });
   return _loadPromise;
 }
 
