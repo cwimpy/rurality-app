@@ -24,6 +24,8 @@ yarn-error.log*
 
 # Claude Code
 .claude/
+.agents/
+skills-lock.json
 
 # Raw source data
 data_raw/
