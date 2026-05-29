@@ -3,7 +3,7 @@ import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap,
   Building2, DollarSign, AlertCircle, Wifi,
-  BookOpen, FlaskConical, ExternalLink, Database, Calculator
+  BookOpen, FlaskConical, ExternalLink, Database, Calculator, ChevronDown
 } from 'lucide-react';
 
 import LeafletMap from './components/LeafletMap';
@@ -25,6 +25,7 @@ import { calculateRuralityScore } from './services/ruralityCalculator';
 import { loadRucaData, getRUCAForZcta, getRUCADescription, rucaToScore } from './data/rucaZcta';
 import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/ruralUrbanCodes';
 import { loadBroadbandData, getBroadband } from './data/broadband';
+import { loadFarData, getFARForZip, getFARDescription } from './data/far';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -39,6 +40,80 @@ const ViewFallback = () => (
     </span>
   </div>
 );
+
+// ── Comparison measures registry ─────────────────────────────────────────────
+// Independent rural classifications surfaced for public reference. These are
+// NOT inputs to the composite score (that decision waits for the Phase 1 PCA).
+// Each entry carries the metadata a researcher needs to judge comparability —
+// agency, vintage, geography unit, and a link to the authoritative dataset —
+// and doubles as the seed for the planned codebook page. New measures (UIC,
+// NCHS, IRR, …) drop in as additional entries.
+const COMPARISON_MEASURES = [
+  {
+    key: 'far',
+    name: 'Frontier & Remote Area Codes',
+    agency: 'USDA ERS',
+    vintage: '2020',
+    geography: 'ZIP code',
+    url: 'https://www.ers.usda.gov/data-products/frontier-and-remote-area-codes',
+    read: (c) => c?.far,
+    format: (v) => v.level === 0
+      ? 'Not frontier or remote'
+      : `${v.description} of 4${v.level === 4 ? ' · most remote' : ''}`,
+    unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
+    blurb: 'Remoteness by travel time to urban areas of four size classes. Conceptually distinct from density and commuting — it sees isolation that RUCA/RUCC structurally cannot.',
+  },
+];
+
+// Collapsible dashboard panel listing every comparison measure for the current
+// location, with provenance and a source link. Uses native <details> so the
+// disclosure is keyboard-accessible with no extra JS.
+function ComparisonMeasures({ classifications }) {
+  if (!classifications) return null;
+  return (
+    <details open className="group rounded-2xl shadow-sm p-6 sm:p-8 border border-[rgba(26,58,42,0.1)] dark:border-slate-700 bg-white dark:bg-slate-800">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-start justify-between gap-3">
+        <div>
+          <div className="fg-rule mb-2"><span>Exhibit E</span><span>Comparison</span></div>
+          <h3 className="fg-display text-3xl leading-tight" style={{ color: 'var(--color-ink)' }}>
+            Other rural <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>classifications</em>.
+          </h3>
+        </div>
+        <ChevronDown className="w-5 h-5 mt-1 flex-shrink-0 transition-transform group-open:rotate-180" style={{ color: 'var(--color-ink-muted)' }} aria-hidden="true" />
+      </summary>
+
+      <p className="mt-3 text-sm max-w-2xl" style={{ color: 'var(--color-ink-muted)' }}>
+        Independent measures shown for reference. These are <strong>not</strong> inputs to the composite score — they let you see how official schemes classify this place, and where to get each dataset.
+      </p>
+
+      <div className="mt-5 space-y-4">
+        {COMPARISON_MEASURES.map((m) => {
+          const v = m.read(classifications);
+          const has = v != null;
+          return (
+            <div key={m.key} className="pt-4 border-t border-dashed border-[rgba(26,58,42,0.2)] dark:border-[rgba(255,255,255,0.12)]">
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <h4 className="fg-display text-xl" style={{ color: 'var(--color-ink)' }}>{m.name}</h4>
+                <span className="text-[0.6rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                  {m.agency} · {m.vintage} · {m.geography}
+                </span>
+              </div>
+              <div className="mt-1.5 fg-display text-lg" style={{ color: has ? 'var(--color-ink)' : 'var(--color-ink-muted)' }}>
+                {has ? m.format(v) : m.unavailable}
+              </div>
+              <p className="mt-1.5 text-sm max-w-2xl" style={{ color: 'var(--color-ink-muted)' }}>{m.blurb}</p>
+              <a href={m.url} target="_blank" rel="noopener noreferrer"
+                 className="mt-2 inline-flex items-center gap-1 text-[0.65rem] uppercase tracking-[0.22em] font-mono hover:underline rounded"
+                 style={{ color: 'var(--color-sage)' }}>
+                Data source <ExternalLink className="w-3 h-3" aria-hidden="true" />
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
 
 // ── Official classification helpers ──────────────────────────────────────────
 function getOMBDesignation(rucc) {
@@ -225,10 +300,13 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      await Promise.all([loadRucaData(), loadRuccData(), loadBroadbandData()]);
+      // FAR is a comparison measure only — its load is best-effort so a
+      // not-yet-built far.json never breaks scoring.
+      await Promise.all([loadRucaData(), loadRuccData(), loadBroadbandData(), loadFarData().catch(() => {})]);
       if (isStale()) return;
 
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
+      const far = geoData.postcode ? getFARForZip(geoData.postcode) : null;
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -255,6 +333,11 @@ const RuralityApp = () => {
           color: getRUCAColor(rucaCode)
         } : null,
         omb,
+        // Comparison measure — not part of the composite score
+        far: far !== null ? {
+          level: far,
+          description: getFARDescription(far)
+        } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
       };
@@ -2955,6 +3038,11 @@ your_data <- your_data |>
                 compositeScore={ruralityData.overallScore}
                 confidence={ruralityData.confidence}
               />
+            )}
+
+            {/* Other rural classifications — comparison measures (not in composite) */}
+            {ruralityData.classifications && (
+              <ComparisonMeasures classifications={ruralityData.classifications} />
             )}
 
             {/* RUCC History */}
