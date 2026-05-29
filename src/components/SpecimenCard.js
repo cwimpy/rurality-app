@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Download, X } from 'lucide-react';
 
 const TIER = (s) => {
@@ -117,7 +117,7 @@ const StaticDial = ({ cx, cy, score }) => {
   );
 };
 
-const SpecimenCardSVG = React.forwardRef(({ location, score, confidence, classifications, density, coordinates, population }, ref) => {
+function SpecimenCardSVG({ location, score, confidence, classifications, density, coordinates, population, ref }) {
   const tier = TIER(score);
   const conf = confidenceBars(confidence);
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).toUpperCase();
@@ -305,9 +305,7 @@ const SpecimenCardSVG = React.forwardRef(({ location, score, confidence, classif
       </g>
     </svg>
   );
-});
-
-SpecimenCardSVG.displayName = 'SpecimenCardSVG';
+}
 
 export default function SpecimenCard({
   location, score, confidence, classifications, density, coordinates, population,
@@ -374,9 +372,9 @@ export default function SpecimenCard({
             Field Card &middot; Preview
           </div>
           <button onClick={onClose}
-                  className="text-white/70 hover:text-white p-1.5 rounded"
+                  className="text-white/70 hover:text-white rounded inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
                   aria-label="Close">
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 

@@ -26,11 +26,11 @@ export default function DarkModeToggle() {
   return (
     <button
       onClick={() => setDark(prev => !prev)}
-      className="text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+      className="text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
       aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={dark ? 'Light mode' : 'Dark mode'}
     >
-      {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      {dark ? <Sun className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
     </button>
   );
 }

@@ -217,7 +217,7 @@ export default function StateMap({ onLocationSearch }) {
                   <select
                     value={selectedState}
                     onChange={(e) => setSelectedState(e.target.value)}
-                    className="appearance-none w-full border text-sm rounded-md pl-3 pr-9 py-2 cursor-pointer outline-none"
+                    className="appearance-none w-full border text-sm rounded-md pl-3 pr-9 py-2 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#d4a843]"
                     style={{
                       backgroundColor: 'var(--color-cream)',
                       borderColor: 'var(--color-rule)',

@@ -81,11 +81,11 @@ export default function CompareTable({ items, onRemove, getRuralityLevel }) {
               <div key={item.name} className="fg-plate rounded-lg p-5 relative">
                 <button
                   onClick={() => onRemove(item.name)}
-                  className="absolute top-3 right-3 p-1 rounded transition-colors"
+                  className="absolute top-2 right-2 rounded transition-colors inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
                   style={{ color: 'var(--color-ink-muted)' }}
                   aria-label={`Remove ${item.name}`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                 </button>
 
                 {item.loading ? (
@@ -208,11 +208,11 @@ export default function CompareTable({ items, onRemove, getRuralityLevel }) {
                     <td className="py-3 pl-2 pr-3">
                       <button
                         onClick={() => onRemove(item.name)}
-                        className="p-1 rounded transition-colors"
+                        className="p-2 rounded transition-colors inline-flex items-center justify-center"
                         style={{ color: 'var(--color-ink-muted)' }}
                         aria-label={`Remove ${item.name}`}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap,
@@ -8,14 +8,11 @@ import {
 
 import LeafletMap from './components/LeafletMap';
 import DarkModeToggle from './components/DarkModeToggle';
-import BatchLookup from './components/BatchLookup';
-import StateMap from './components/StateMap';
 import PlacesLikeThis from './components/PlacesLikeThis';
 import EmbedWidget from './components/EmbedWidget';
 import RUCCHistory from './components/RUCCHistory';
 import CompareTable from './components/CompareTable';
 import ScoreDial from './components/ScoreDial';
-import SpecimenCard from './components/SpecimenCard';
 
 import {
   geocodeWithCache,
@@ -28,6 +25,20 @@ import { calculateRuralityScore } from './services/ruralityCalculator';
 import { loadRucaData, getRUCAForZcta, getRUCADescription, rucaToScore } from './data/rucaZcta';
 import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/ruralUrbanCodes';
 import { loadBroadbandData, getBroadband } from './data/broadband';
+
+// Code-split heavy, route-like views so they don't load with the initial bundle
+const BatchLookup = lazy(() => import('./components/BatchLookup'));
+const StateMap = lazy(() => import('./components/StateMap'));
+const SpecimenCard = lazy(() => import('./components/SpecimenCard'));
+
+// Fallback shown while a lazy view's chunk loads
+const ViewFallback = () => (
+  <div className="flex items-center justify-center py-24" role="status" aria-live="polite">
+    <span className="text-[0.65rem] uppercase tracking-[0.28em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+      Loading…
+    </span>
+  </div>
+);
 
 // ── Official classification helpers ──────────────────────────────────────────
 function getOMBDesignation(rucc) {
@@ -167,6 +178,13 @@ const RuralityApp = () => {
 
   // Auto-search from URL ?q= parameter on initial load
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef(null);
+  const showToast = (msg) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2600);
+  };
 
   const getRuralityLevel = (score) => {
     if (score >= 80) return { level: 'Very Rural', color: 'text-green-800 bg-green-200 border-green-300' };
@@ -453,7 +471,7 @@ const RuralityApp = () => {
       try { await navigator.share({ title: 'Rurality.app', text: report, url: shareUrl }); return; }
       catch { /* cancelled — clipboard still has the report */ }
     }
-    alert('Field report copied to clipboard');
+    showToast('Field report copied to clipboard');
   };
 
   const exportData = () => {
@@ -1988,7 +2006,8 @@ const RuralityApp = () => {
           </pre>
           <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 px-2 py-1 text-xs rounded-md transition-all bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white opacity-0 group-hover:opacity-100"
+            aria-label="Copy code"
+            className="absolute top-2 right-2 px-2 py-1 text-xs rounded-md transition bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
@@ -2701,6 +2720,7 @@ your_data <- your_data |>
                 <button
                   onClick={() => handleLocationSearch(searchQuery).catch(() => {})}
                   disabled={loading || !searchQuery.trim()}
+                  aria-busy={loading}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-md text-xs uppercase tracking-wider font-mono transition-colors disabled:opacity-50"
                   style={{
                     backgroundColor: loading ? 'var(--color-sage)' : 'var(--color-forest)',
@@ -2725,10 +2745,13 @@ your_data <- your_data |>
               </div>
             </div>
 
+            {/* Screen-reader announcement for loading progress (visible step text is hidden on mobile) */}
+            <span className="sr-only" aria-live="polite">{loading ? (loadingStep || 'Analyzing…') : ''}</span>
+
             {error && (
-              <div className="mt-4 flex items-center gap-2 rounded-md border-l-4 px-4 py-3 text-sm"
+              <div role="alert" className="mt-4 flex items-center gap-2 rounded-md border-l-4 px-4 py-3 text-sm"
                    style={{ borderColor: '#991b1b', backgroundColor: 'var(--color-parchment)', color: '#991b1b' }}>
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                 <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-1" style={{ color: '#991b1b' }}>Error</span>
                 <span>{error}</span>
               </div>
@@ -2773,8 +2796,8 @@ your_data <- your_data |>
 
         {/* Views */}
         {activeView === 'map' && <MapView />}
-        {activeView === 'statemap'     && <StateMap onLocationSearch={(place) => { setSearchQuery(place); setActiveView('dashboard'); handleLocationSearch(place).catch(() => {}); }} />}
-        {activeView === 'batch'        && <BatchLookup />}
+        {activeView === 'statemap'     && <Suspense fallback={<ViewFallback />}><StateMap onLocationSearch={(place) => { setSearchQuery(place); setActiveView('dashboard'); handleLocationSearch(place).catch(() => {}); }} /></Suspense>}
+        {activeView === 'batch'        && <Suspense fallback={<ViewFallback />}><BatchLookup /></Suspense>}
         {activeView === 'trends'       && <TrendsView />}
         {activeView === 'methodology'  && <MethodologyView />}
         {activeView === 'researchers'  && <ForResearchersView />}
@@ -3212,29 +3235,42 @@ your_data <- your_data |>
 
       {/* Specimen Card modal */}
       {specimenOpen && ruralityData && (
-        <SpecimenCard
-          location={currentLocation}
-          score={ruralityData.overallScore}
-          confidence={ruralityData.confidence}
-          classifications={ruralityData.classifications}
-          density={ruralityData.metrics?.populationDensity?.value ?? null}
-          coordinates={ruralityData.coordinates}
-          population={ruralityData.demographics?.population ?? 0}
-          onClose={() => setSpecimenOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <SpecimenCard
+            location={currentLocation}
+            score={ruralityData.overallScore}
+            confidence={ruralityData.confidence}
+            classifications={ruralityData.classifications}
+            density={ruralityData.metrics?.populationDensity?.value ?? null}
+            coordinates={ruralityData.coordinates}
+            population={ruralityData.demographics?.population ?? 0}
+            onClose={() => setSpecimenOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* Info panel — toggleable */}
+      {/* Transient confirmation toast (e.g. clipboard copy) */}
+      <div aria-live="polite" role="status" className="sr-only">{toast}</div>
+      {toast && (
+        <div
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-md shadow-lg text-xs uppercase tracking-wider font-mono"
+          style={{ backgroundColor: 'var(--color-forest)', color: 'var(--color-wheat)' }}
+        >
+          {toast}
+        </div>
+      )}
+
       <div className="fixed bottom-4 right-4 z-40">
         {showDataSources ? (
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 p-4 max-w-xs">
             <div className="flex items-start space-x-3">
-              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-ink-muted)' }} />
+              <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-ink-muted)' }} aria-hidden="true" />
               <div className="text-sm flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="font-medium text-slate-800 dark:text-slate-100">Live Data Sources</div>
-                  <button onClick={() => setShowDataSources(false)} className="text-slate-400 hover:text-slate-600 ml-2">
-                    <X className="w-4 h-4" />
+                  <button onClick={() => setShowDataSources(false)} aria-label="Close data sources" className="text-slate-400 hover:text-slate-600 ml-2 inline-flex items-center justify-center min-w-[44px] min-h-[44px]">
+                    <X className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
                 <div className="text-slate-600 space-y-1 text-xs">
@@ -3249,10 +3285,11 @@ your_data <- your_data |>
         ) : (
           <button
             onClick={() => setShowDataSources(true)}
-            className="bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            className="bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors inline-flex items-center justify-center min-w-[44px] min-h-[44px]"
+            aria-label="Show live data sources"
             title="Live Data Sources"
           >
-            <Info className="w-5 h-5" style={{ color: 'var(--color-ink-muted)' }} />
+            <Info className="w-5 h-5" style={{ color: 'var(--color-ink-muted)' }} aria-hidden="true" />
           </button>
         )}
       </div>

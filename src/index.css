@@ -118,6 +118,9 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .fg-rise, .fg-ticker-track { animation: none; }
   .fg-rise { opacity: 1; transform: none; }
+  /* Keep the shadow lift on hover, but drop the translate/rotate motion */
+  .fg-plate { transition: box-shadow 0.4s; }
+  .fg-plate:hover { transform: none; }
 }
 
 /* Rule with centered mark (§) */

@@ -269,10 +269,9 @@ export default function BatchLookup() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* File upload */}
-            <div
-              onClick={() => fileRef.current?.click()}
-              className="rounded-lg p-8 text-center cursor-pointer transition-colors group"
+            {/* File upload — label wraps a focusable (sr-only) input so it is keyboard-reachable */}
+            <label
+              className="rounded-lg p-8 text-center cursor-pointer transition-colors group block"
               style={{
                 backgroundColor: 'var(--color-cream)',
                 border: '2px dashed var(--color-ink-muted)',
@@ -280,7 +279,7 @@ export default function BatchLookup() {
               onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-wheat)'}
               onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-ink-muted)'}
             >
-              <Upload className="w-7 h-7 mx-auto mb-4" style={{ color: 'var(--color-ink-muted)' }} />
+              <Upload className="w-7 h-7 mx-auto mb-4" style={{ color: 'var(--color-ink-muted)' }} aria-hidden="true" />
               <div className="text-[0.65rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
                 Upload CSV
               </div>
@@ -290,8 +289,16 @@ export default function BatchLookup() {
               <p className="mt-2 text-[0.65rem] uppercase tracking-[0.22em] font-mono" style={{ color: 'var(--color-ink-muted)', opacity: 0.8 }}>
                 Column must be named: location · address · place · city · zip
               </p>
-              <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleFile} />
-            </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.txt"
+                className="sr-only"
+                onChange={handleFile}
+                onFocus={(e) => { const l = e.currentTarget.closest('label'); if (l) l.style.borderColor = 'var(--color-wheat)'; }}
+                onBlur={(e) => { const l = e.currentTarget.closest('label'); if (l) l.style.borderColor = 'var(--color-ink-muted)'; }}
+              />
+            </label>
 
             {/* Paste */}
             <div className="rounded-lg p-5"
