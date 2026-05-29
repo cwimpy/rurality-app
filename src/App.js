@@ -26,6 +26,7 @@ import { loadRucaData, getRUCAForZcta, getRUCADescription, rucaToScore } from '.
 import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/ruralUrbanCodes';
 import { loadBroadbandData, getBroadband } from './data/broadband';
 import { loadFarData, getFARForZip, getFARDescription } from './data/far';
+import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -62,6 +63,18 @@ const COMPARISON_MEASURES = [
       : `${v.description} of 4${v.level === 4 ? ' · most remote' : ''}`,
     unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
     blurb: 'Remoteness by travel time to urban areas of four size classes. Conceptually distinct from density and commuting — it sees isolation that RUCA/RUCC structurally cannot.',
+  },
+  {
+    key: 'nchs',
+    name: 'NCHS Urban–Rural Classification',
+    agency: 'CDC NCHS',
+    vintage: '2023',
+    geography: 'County',
+    url: 'https://www.cdc.gov/nchs/data-analysis-tools/urban-rural.html',
+    read: (c) => c?.nchs,
+    format: (v) => `${v.description} · ${v.code} of 6${v.code === 6 ? ' · most rural' : ''}`,
+    unavailable: 'County-level — not resolved for this location',
+    blurb: 'Six-level scheme built for health research, splitting four metro tiers from micropolitan and noncore. The standard convergent measure for rural health outcomes.',
   },
 ];
 
@@ -300,13 +313,17 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      // FAR is a comparison measure only — its load is best-effort so a
-      // not-yet-built far.json never breaks scoring.
-      await Promise.all([loadRucaData(), loadRuccData(), loadBroadbandData(), loadFarData().catch(() => {})]);
+      // FAR and NCHS are comparison measures only — their loads are best-effort
+      // so a not-yet-built data file never breaks scoring.
+      await Promise.all([
+        loadRucaData(), loadRuccData(), loadBroadbandData(),
+        loadFarData().catch(() => {}), loadNchsData().catch(() => {})
+      ]);
       if (isStale()) return;
 
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
       const far = geoData.postcode ? getFARForZip(geoData.postcode) : null;
+      const nchs = getNCHSForCounty(countyData.stateFips, countyData.countyFips);
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -333,10 +350,14 @@ const RuralityApp = () => {
           color: getRUCAColor(rucaCode)
         } : null,
         omb,
-        // Comparison measure — not part of the composite score
+        // Comparison measures — not part of the composite score
         far: far !== null ? {
           level: far,
           description: getFARDescription(far)
+        } : null,
+        nchs: nchs !== null ? {
+          code: nchs,
+          description: getNCHSDescription(nchs)
         } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
