@@ -27,6 +27,7 @@ import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/r
 import { loadBroadbandData, getBroadband } from './data/broadband';
 import { loadFarData, getFARForZip, getFARDescription } from './data/far';
 import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs';
+import { loadUicData, getUICForCounty, getUICDescription } from './data/uic';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -75,6 +76,18 @@ const COMPARISON_MEASURES = [
     format: (v) => `${v.description} · ${v.code} of 6${v.code === 6 ? ' · most rural' : ''}`,
     unavailable: 'County-level — not resolved for this location',
     blurb: 'Six-level scheme built for health research, splitting four metro tiers from micropolitan and noncore. The standard convergent measure for rural health outcomes.',
+  },
+  {
+    key: 'uic',
+    name: 'Urban Influence Codes',
+    agency: 'USDA ERS',
+    vintage: '2024',
+    geography: 'County',
+    url: 'https://www.ers.usda.gov/data-products/urban-influence-codes',
+    read: (c) => c?.uic,
+    format: (v) => `${v.description} · UIC ${v.code}`,
+    unavailable: 'County-level — not resolved for this location',
+    blurb: 'Nine-category scheme keyed to metro status, metro adjacency, and largest town size. Note: not a ranked rural gradient — the codes index settlement structure, not ordered remoteness.',
   },
 ];
 
@@ -313,17 +326,18 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      // FAR and NCHS are comparison measures only — their loads are best-effort
-      // so a not-yet-built data file never breaks scoring.
+      // FAR, NCHS, and UIC are comparison measures only — their loads are
+      // best-effort so a not-yet-built data file never breaks scoring.
       await Promise.all([
         loadRucaData(), loadRuccData(), loadBroadbandData(),
-        loadFarData().catch(() => {}), loadNchsData().catch(() => {})
+        loadFarData().catch(() => {}), loadNchsData().catch(() => {}), loadUicData().catch(() => {})
       ]);
       if (isStale()) return;
 
       const ruca = geoData.postcode ? getRUCAForZcta(geoData.postcode) : null;
       const far = geoData.postcode ? getFARForZip(geoData.postcode) : null;
       const nchs = getNCHSForCounty(countyData.stateFips, countyData.countyFips);
+      const uic = getUICForCounty(countyData.stateFips, countyData.countyFips);
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -358,6 +372,10 @@ const RuralityApp = () => {
         nchs: nchs !== null ? {
           code: nchs,
           description: getNCHSDescription(nchs)
+        } : null,
+        uic: uic !== null ? {
+          code: uic,
+          description: getUICDescription(uic)
         } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
