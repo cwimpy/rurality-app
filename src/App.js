@@ -30,6 +30,7 @@ import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs'
 import { loadUicData, getUICForCounty, getUICDescription } from './data/uic';
 import { loadIrrData, getIRRForCounty } from './data/irr';
 import { loadLocaleData, getLocaleForZcta, getLocaleDescription } from './data/locale';
+import { loadForhpData, getFORHPForZip } from './data/forhp';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -114,6 +115,18 @@ const COMPARISON_MEASURES = [
     format: (v) => `${v.description} · NCES ${v.code}`,
     unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
     blurb: 'Education-standard 12-category scheme (City / Suburb / Town / Rural, each in three sizes or remoteness tiers), built on 2020 Census urban areas. Final NCES experimental ZCTA edition. US federal work — public domain.',
+  },
+  {
+    key: 'forhp',
+    name: 'FORHP Rural Health Eligibility',
+    agency: 'HRSA · public domain',
+    vintage: '2024',
+    geography: 'ZIP / ZCTA',
+    url: 'https://www.hrsa.gov/rural-health/about-us/what-is-rural/data-files',
+    read: (c) => c?.forhp,
+    format: (v) => v.eligible ? 'Rural-eligible — Yes' : 'Rural-eligible — No',
+    unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
+    blurb: 'Eligibility flag for federal rural-health grants — not an independent classification. HRSA derives it from RUCA + Road Ruggedness Scale + OMB metro/nonmetro. The only measure here that actually gates funding. US federal work — public domain.',
   },
 ];
 
@@ -352,13 +365,13 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      // FAR, NCHS, UIC, IRR, and NCES locale are comparison measures only —
-      // their loads are best-effort so a not-yet-built file never breaks scoring.
+      // FAR, NCHS, UIC, IRR, NCES locale, and FORHP are comparison measures
+      // only — best-effort loads so a not-yet-built file never breaks scoring.
       await Promise.all([
         loadRucaData(), loadRuccData(), loadBroadbandData(),
         loadFarData().catch(() => {}), loadNchsData().catch(() => {}),
         loadUicData().catch(() => {}), loadIrrData().catch(() => {}),
-        loadLocaleData().catch(() => {})
+        loadLocaleData().catch(() => {}), loadForhpData().catch(() => {})
       ]);
       if (isStale()) return;
 
@@ -368,6 +381,7 @@ const RuralityApp = () => {
       const uic = getUICForCounty(countyData.stateFips, countyData.countyFips);
       const irr = getIRRForCounty(countyData.stateFips, countyData.countyFips);
       const locale = geoData.postcode ? getLocaleForZcta(geoData.postcode) : null;
+      const forhp = geoData.postcode ? getFORHPForZip(geoData.postcode) : null;
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -412,6 +426,7 @@ const RuralityApp = () => {
           code: locale,
           description: getLocaleDescription(locale)
         } : null,
+        forhp: forhp !== null ? { eligible: forhp === 1 } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
       };
@@ -1508,6 +1523,7 @@ const RuralityApp = () => {
       { n: '10', name: 'USDA ERS Urban Influence Codes (UIC)',            vintage: '2024', scale: '3,233 counties',    detail: 'Comparison measure (not in composite) — 9-category settlement structure', url: 'https://www.ers.usda.gov/data-products/urban-influence-codes' },
       { n: '11', name: 'Index of Relative Rurality (Kim & Waldorf, CC BY 4.0)', vintage: '2020', scale: '3,143 counties', detail: 'Comparison measure (not in composite) — continuous 0–1 index', url: 'https://doi.org/10.5281/zenodo.7675745' },
       { n: '12', name: 'NCES EDGE Locale Codes (public domain)',          vintage: '2021', scale: '33,791 ZCTAs',      detail: 'Comparison measure (not in composite) — 12-category City/Suburb/Town/Rural', url: 'https://nces.ed.gov/programs/edge/Geographic/ZCTAAssignments' },
+      { n: '13', name: 'HRSA FORHP rural eligibility (public domain)',    vintage: '2024', scale: '41,062 ZIPs',       detail: 'Comparison measure (not in composite) — rural-health grant eligibility flag', url: 'https://www.hrsa.gov/rural-health/about-us/what-is-rural/data-files' },
     ];
 
     const limitations = [
