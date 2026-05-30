@@ -2324,6 +2324,23 @@ your_data <- your_data |>
         file: null, fileLabel: null },
     ];
 
+    // Independent rural classifications shown in the app's comparison panel —
+    // NOT composite inputs. Listed so researchers can download and compare.
+    const comparisonSources = [
+      { n: '01', name: 'USDA ERS Frontier & Remote Area Codes (FAR)', geo: 'ZIP', vintage: '2020', license: 'Public domain',
+        page: 'https://www.ers.usda.gov/data-products/frontier-and-remote-area-codes' },
+      { n: '02', name: 'USDA ERS Urban Influence Codes (UIC)', geo: 'County', vintage: '2024', license: 'Public domain',
+        page: 'https://www.ers.usda.gov/data-products/urban-influence-codes' },
+      { n: '03', name: 'CDC NCHS Urban–Rural Classification', geo: 'County', vintage: '2023', license: 'Public domain',
+        page: 'https://www.cdc.gov/nchs/data-analysis-tools/urban-rural.html' },
+      { n: '04', name: 'NCES EDGE Locale Codes', geo: 'ZCTA', vintage: '2021', license: 'Public domain',
+        page: 'https://nces.ed.gov/programs/edge/Geographic/ZCTAAssignments' },
+      { n: '05', name: 'HRSA FORHP Rural Health Eligibility', geo: 'ZIP', vintage: '2024', license: 'Public domain',
+        page: 'https://www.hrsa.gov/rural-health/about-us/what-is-rural/data-files' },
+      { n: '06', name: 'Index of Relative Rurality (Kim & Waldorf)', geo: 'County', vintage: '2020', license: 'CC BY 4.0',
+        page: 'https://doi.org/10.5281/zenodo.7675745' },
+    ];
+
     const Chapter = ({ num, kicker, title, children }) => (
       <section className="relative">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
@@ -2676,8 +2693,38 @@ your_data <- your_data |>
           </ul>
         </Chapter>
 
-        {/* ── §7 Embed ──────────────────────────────────────────────── */}
-        <Chapter num="§7" kicker="On Your Own Site" title={<>Embed the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>widget</em>.</>}>
+        {/* ── §7 Comparison Measures ────────────────────────────────── */}
+        <Chapter num="§7" kicker="Cross-Reference" title={<>Comparison <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>measures</em>.</>}>
+          <p className="text-sm mb-5" style={{ color: 'var(--color-ink-muted)' }}>
+            Independent rural classifications shown in each report's <strong>Other rural classifications</strong> panel.
+            These are <strong>not</strong> inputs to the composite score — they're surfaced so you can see how official
+            schemes classify a place, and download each dataset at the source. Licenses noted; all are reusable with attribution.
+          </p>
+          <ul className="divide-y divide-dashed divide-[rgba(26,58,42,0.18)] dark:divide-[rgba(255,255,255,0.1)] border-y border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
+            {comparisonSources.map(({ n, name, geo, vintage, license, page }) => (
+              <li key={n} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-3 sm:gap-6 py-4 items-baseline">
+                <span className="fg-numeral text-2xl sm:text-3xl w-10" style={{ color: 'var(--color-wheat)' }}>{n}</span>
+                <div>
+                  <a href={page} target="_blank" rel="noopener noreferrer"
+                     className="fg-display text-lg leading-tight inline-flex items-baseline gap-1.5 hover:underline"
+                     style={{ color: 'var(--color-ink)' }}>
+                    {name} <ExternalLink className="w-3 h-3 self-center" />
+                  </a>
+                  <div className="mt-1 text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
+                    {geo} &middot; Vintage {vintage}
+                  </div>
+                </div>
+                <span className="self-baseline sm:self-center flex-shrink-0 px-3 py-1.5 text-[0.65rem] uppercase tracking-[0.2em] font-mono rounded border"
+                      style={{ borderColor: 'var(--color-sage)', color: 'var(--color-ink-muted)' }}>
+                  {license}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Chapter>
+
+        {/* ── §8 Embed ──────────────────────────────────────────────── */}
+        <Chapter num="§8" kicker="On Your Own Site" title={<>Embed the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>widget</em>.</>}>
           <div className="rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
                style={{ backgroundColor: 'var(--color-cream)' }}>
             <EmbedWidget />
