@@ -29,6 +29,7 @@ import { loadFarData, getFARForZip, getFARDescription } from './data/far';
 import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs';
 import { loadUicData, getUICForCounty, getUICDescription } from './data/uic';
 import { loadIrrData, getIRRForCounty } from './data/irr';
+import { loadLocaleData, getLocaleForZcta, getLocaleDescription } from './data/locale';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -101,6 +102,18 @@ const COMPARISON_MEASURES = [
     format: (v) => `${v.value.toFixed(3)} on 0–1 · higher = more rural`,
     unavailable: 'County-level — not resolved for this location',
     blurb: 'The only continuous measure here — an equal-weight composite of population, density, remoteness, and built-up area, with no commute flows, so methodologically distinct. Kim & Waldorf 2023 (CC BY 4.0); values reformatted to JSON.',
+  },
+  {
+    key: 'locale',
+    name: 'NCES Locale Codes',
+    agency: 'NCES · public domain',
+    vintage: '2021',
+    geography: 'ZIP / ZCTA',
+    url: 'https://nces.ed.gov/programs/edge/Geographic/ZCTAAssignments',
+    read: (c) => c?.locale,
+    format: (v) => `${v.description} · NCES ${v.code}`,
+    unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
+    blurb: 'Education-standard 12-category scheme (City / Suburb / Town / Rural, each in three sizes or remoteness tiers), built on 2020 Census urban areas. Final NCES experimental ZCTA edition. US federal work — public domain.',
   },
 ];
 
@@ -339,12 +352,13 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      // FAR, NCHS, UIC, and IRR are comparison measures only — their loads are
-      // best-effort so a not-yet-built data file never breaks scoring.
+      // FAR, NCHS, UIC, IRR, and NCES locale are comparison measures only —
+      // their loads are best-effort so a not-yet-built file never breaks scoring.
       await Promise.all([
         loadRucaData(), loadRuccData(), loadBroadbandData(),
         loadFarData().catch(() => {}), loadNchsData().catch(() => {}),
-        loadUicData().catch(() => {}), loadIrrData().catch(() => {})
+        loadUicData().catch(() => {}), loadIrrData().catch(() => {}),
+        loadLocaleData().catch(() => {})
       ]);
       if (isStale()) return;
 
@@ -353,6 +367,7 @@ const RuralityApp = () => {
       const nchs = getNCHSForCounty(countyData.stateFips, countyData.countyFips);
       const uic = getUICForCounty(countyData.stateFips, countyData.countyFips);
       const irr = getIRRForCounty(countyData.stateFips, countyData.countyFips);
+      const locale = geoData.postcode ? getLocaleForZcta(geoData.postcode) : null;
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -393,6 +408,10 @@ const RuralityApp = () => {
           description: getUICDescription(uic)
         } : null,
         irr: irr !== null ? { value: irr } : null,
+        locale: locale !== null ? {
+          code: locale,
+          description: getLocaleDescription(locale)
+        } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
       };
@@ -1488,6 +1507,7 @@ const RuralityApp = () => {
       { n: '09', name: 'CDC NCHS Urban-Rural Classification Scheme',      vintage: '2023', scale: '3,144 counties',    detail: 'Comparison measure (not in composite) — 6-level health-research scheme', url: 'https://www.cdc.gov/nchs/data-analysis-tools/urban-rural.html' },
       { n: '10', name: 'USDA ERS Urban Influence Codes (UIC)',            vintage: '2024', scale: '3,233 counties',    detail: 'Comparison measure (not in composite) — 9-category settlement structure', url: 'https://www.ers.usda.gov/data-products/urban-influence-codes' },
       { n: '11', name: 'Index of Relative Rurality (Kim & Waldorf, CC BY 4.0)', vintage: '2020', scale: '3,143 counties', detail: 'Comparison measure (not in composite) — continuous 0–1 index', url: 'https://doi.org/10.5281/zenodo.7675745' },
+      { n: '12', name: 'NCES EDGE Locale Codes (public domain)',          vintage: '2021', scale: '33,791 ZCTAs',      detail: 'Comparison measure (not in composite) — 12-category City/Suburb/Town/Rural', url: 'https://nces.ed.gov/programs/edge/Geographic/ZCTAAssignments' },
     ];
 
     const limitations = [
