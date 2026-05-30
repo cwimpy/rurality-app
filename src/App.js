@@ -1468,6 +1468,9 @@ const RuralityApp = () => {
       { n: '05', name: 'OpenStreetMap / Nominatim',                       vintage: 'live', scale: 'service',           detail: 'Forward/reverse geocoding, rate-limited',          url: 'https://nominatim.openstreetmap.org/' },
       { n: '06', name: 'FCC Census Area API',                             vintage: 'live', scale: 'fallback',          detail: 'County FIPS lookup when Census Geocoder is down',  url: 'https://geo.fcc.gov/api/census/' },
       { n: '07', name: 'FCC Broadband Data Collection (BDC)',             vintage: 'Jun 2025', scale: '3,232 counties', detail: '% locations served at 100/20 Mbps (wired + licensed FW)', url: 'https://broadbandmap.fcc.gov/data-download/nationwide-data' },
+      { n: '08', name: 'USDA ERS Frontier & Remote Area Codes (FAR)',     vintage: '2020', scale: '32,158 ZIPs',       detail: 'Comparison measure (not in composite) — remoteness by travel time', url: 'https://www.ers.usda.gov/data-products/frontier-and-remote-area-codes' },
+      { n: '09', name: 'CDC NCHS Urban-Rural Classification Scheme',      vintage: '2023', scale: '3,144 counties',    detail: 'Comparison measure (not in composite) — 6-level health-research scheme', url: 'https://www.cdc.gov/nchs/data-analysis-tools/urban-rural.html' },
+      { n: '10', name: 'USDA ERS Urban Influence Codes (UIC)',            vintage: '2024', scale: '3,233 counties',    detail: 'Comparison measure (not in composite) — 9-category settlement structure', url: 'https://www.ers.usda.gov/data-products/urban-influence-codes' },
     ];
 
     const limitations = [
