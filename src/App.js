@@ -28,6 +28,7 @@ import { loadBroadbandData, getBroadband } from './data/broadband';
 import { loadFarData, getFARForZip, getFARDescription } from './data/far';
 import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs';
 import { loadUicData, getUICForCounty, getUICDescription } from './data/uic';
+import { loadIrrData, getIRRForCounty } from './data/irr';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -88,6 +89,18 @@ const COMPARISON_MEASURES = [
     format: (v) => `${v.description} · UIC ${v.code}`,
     unavailable: 'County-level — not resolved for this location',
     blurb: 'Nine-category scheme keyed to metro status, metro adjacency, and largest town size. Note: not a ranked rural gradient — the codes index settlement structure, not ordered remoteness.',
+  },
+  {
+    key: 'irr',
+    name: 'Index of Relative Rurality (IRR)',
+    agency: 'Kim & Waldorf · CC BY 4.0',
+    vintage: '2020',
+    geography: 'County',
+    url: 'https://doi.org/10.5281/zenodo.7675745',
+    read: (c) => c?.irr,
+    format: (v) => `${v.value.toFixed(3)} on 0–1 · higher = more rural`,
+    unavailable: 'County-level — not resolved for this location',
+    blurb: 'The only continuous measure here — an equal-weight composite of population, density, remoteness, and built-up area, with no commute flows, so methodologically distinct. Kim & Waldorf 2023 (CC BY 4.0); values reformatted to JSON.',
   },
 ];
 
@@ -326,11 +339,12 @@ const RuralityApp = () => {
 
       // Lookup tables must be loaded before getRUCAForZcta / getRUCC can
       // return a code (both are sync and silently return null if not loaded).
-      // FAR, NCHS, and UIC are comparison measures only — their loads are
+      // FAR, NCHS, UIC, and IRR are comparison measures only — their loads are
       // best-effort so a not-yet-built data file never breaks scoring.
       await Promise.all([
         loadRucaData(), loadRuccData(), loadBroadbandData(),
-        loadFarData().catch(() => {}), loadNchsData().catch(() => {}), loadUicData().catch(() => {})
+        loadFarData().catch(() => {}), loadNchsData().catch(() => {}),
+        loadUicData().catch(() => {}), loadIrrData().catch(() => {})
       ]);
       if (isStale()) return;
 
@@ -338,6 +352,7 @@ const RuralityApp = () => {
       const far = geoData.postcode ? getFARForZip(geoData.postcode) : null;
       const nchs = getNCHSForCounty(countyData.stateFips, countyData.countyFips);
       const uic = getUICForCounty(countyData.stateFips, countyData.countyFips);
+      const irr = getIRRForCounty(countyData.stateFips, countyData.countyFips);
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -377,6 +392,7 @@ const RuralityApp = () => {
           code: uic,
           description: getUICDescription(uic)
         } : null,
+        irr: irr !== null ? { value: irr } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
       };
@@ -1471,6 +1487,7 @@ const RuralityApp = () => {
       { n: '08', name: 'USDA ERS Frontier & Remote Area Codes (FAR)',     vintage: '2020', scale: '32,158 ZIPs',       detail: 'Comparison measure (not in composite) — remoteness by travel time', url: 'https://www.ers.usda.gov/data-products/frontier-and-remote-area-codes' },
       { n: '09', name: 'CDC NCHS Urban-Rural Classification Scheme',      vintage: '2023', scale: '3,144 counties',    detail: 'Comparison measure (not in composite) — 6-level health-research scheme', url: 'https://www.cdc.gov/nchs/data-analysis-tools/urban-rural.html' },
       { n: '10', name: 'USDA ERS Urban Influence Codes (UIC)',            vintage: '2024', scale: '3,233 counties',    detail: 'Comparison measure (not in composite) — 9-category settlement structure', url: 'https://www.ers.usda.gov/data-products/urban-influence-codes' },
+      { n: '11', name: 'Index of Relative Rurality (Kim & Waldorf, CC BY 4.0)', vintage: '2020', scale: '3,143 counties', detail: 'Comparison measure (not in composite) — continuous 0–1 index', url: 'https://doi.org/10.5281/zenodo.7675745' },
     ];
 
     const limitations = [
@@ -1758,6 +1775,7 @@ const RuralityApp = () => {
       { n: '04', citation: 'Hart, L. G., Larson, E. H., & Lishner, D. M. (2005). Rural definitions for health policy and research. American Journal of Public Health, 95(7), 1149–1155.', url: null },
       { n: '05', citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan, micropolitan, and combined statistical areas.', url: null },
       { n: '06', citation: 'Federal Communications Commission. (2025). Broadband Data Collection — National Broadband Map (J25 filing, June 2025).', url: 'https://broadbandmap.fcc.gov/data-download/nationwide-data' },
+      { n: '07', citation: 'Kim, A., & Waldorf, B. (2023). The Index of Relative Rurality (IRR): US County Data for 2020 (Version 1.0.0) [Data set]. Zenodo. Licensed under CC BY 4.0.', url: 'https://doi.org/10.5281/zenodo.7675745' },
     ];
 
     const Chapter = ({ num, kicker, title, children }) => (
