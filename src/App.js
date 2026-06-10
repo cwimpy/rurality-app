@@ -31,6 +31,8 @@ import { loadUicData, getUICForCounty, getUICDescription } from './data/uic';
 import { loadIrrData, getIRRForCounty } from './data/irr';
 import { loadLocaleData, getLocaleForZcta, getLocaleDescription } from './data/locale';
 import { loadForhpData, getFORHPForZip } from './data/forhp';
+import { loadCbsaData, getCBSAForCounty } from './data/cbsa';
+import { loadUrbanData, getUrbanPctForCounty } from './data/urban';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
@@ -128,6 +130,32 @@ const COMPARISON_MEASURES = [
     unavailable: 'ZIP-level — search a specific address or ZIP to resolve',
     blurb: 'Eligibility flag for federal rural-health grants — not an independent classification. HRSA derives it from RUCA + Road Ruggedness Scale + OMB metro/nonmetro. The only measure here that actually gates funding. US federal work — public domain.',
   },
+  {
+    key: 'cbsa',
+    name: 'OMB Metro–Micro Delineations',
+    agency: 'OMB / Census · public domain',
+    vintage: 'Jul 2023',
+    geography: 'County',
+    url: 'https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html',
+    read: (c) => c?.cbsa,
+    format: (v) => v.status === 0
+      ? 'Noncore — outside any CBSA'
+      : `${v.status === 1 ? 'Metropolitan' : 'Micropolitan'} — ${v.title} · ${v.central ? 'central' : 'outlying'} county`,
+    unavailable: 'County-level — not resolved for this location',
+    blurb: 'The base metro / micro / noncore trichotomy (OMB Bulletin 23-01) — the most-cited rural definition in federal policy and the upstream of RUCC, UIC, NCHS, and FORHP eligibility. US federal work — public domain.',
+  },
+  {
+    key: 'urban',
+    name: 'Census % Urban Population',
+    agency: 'US Census Bureau · public domain',
+    vintage: '2020',
+    geography: 'County',
+    url: 'https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html',
+    read: (c) => c?.urban,
+    format: (v) => `${v.pct.toFixed(1)}% urban · ${(100 - v.pct).toFixed(1)}% rural`,
+    unavailable: 'County-level — not resolved for this location',
+    blurb: 'Share of county population living in 2020 Census urban areas (block-built density delineation; 2,611 urban areas nationwide). Continuous like IRR, but a pure census tabulation with no modeling. US federal work — public domain.',
+  },
 ];
 
 // Collapsible dashboard panel listing every comparison measure for the current
@@ -181,6 +209,15 @@ function ComparisonMeasures({ classifications }) {
 }
 
 // ── Official classification helpers ──────────────────────────────────────────
+// Authoritative OMB designation from the July 2023 delineation file (cbsa.json).
+function getOMBDesignationFromCBSA(status) {
+  if (status === 1) return { label: 'Metropolitan', color: 'text-red-700 bg-red-100 border-red-300' };
+  if (status === 2) return { label: 'Micropolitan', color: 'text-yellow-700 bg-yellow-100 border-yellow-300' };
+  return                   { label: 'Noncore',      color: 'text-green-700 bg-green-100 border-green-300' };
+}
+
+// Fallback only (when cbsa.json fails to load): approximate the OMB designation
+// from RUCC. Inexact — RUCC 4–5 are not exactly the micropolitan counties.
 function getOMBDesignation(rucc) {
   if (rucc === null || rucc === undefined) return null;
   if (rucc <= 3) return { label: 'Metropolitan',   color: 'text-red-700 bg-red-100 border-red-300' };
@@ -371,7 +408,8 @@ const RuralityApp = () => {
         loadRucaData(), loadRuccData(), loadBroadbandData(),
         loadFarData().catch(() => {}), loadNchsData().catch(() => {}),
         loadUicData().catch(() => {}), loadIrrData().catch(() => {}),
-        loadLocaleData().catch(() => {}), loadForhpData().catch(() => {})
+        loadLocaleData().catch(() => {}), loadForhpData().catch(() => {}),
+        loadCbsaData().catch(() => {}), loadUrbanData().catch(() => {})
       ]);
       if (isStale()) return;
 
@@ -382,6 +420,8 @@ const RuralityApp = () => {
       const irr = getIRRForCounty(countyData.stateFips, countyData.countyFips);
       const locale = geoData.postcode ? getLocaleForZcta(geoData.postcode) : null;
       const forhp = geoData.postcode ? getFORHPForZip(geoData.postcode) : null;
+      const cbsa = getCBSAForCounty(countyData.stateFips, countyData.countyFips);
+      const urbanPct = getUrbanPctForCounty(countyData.stateFips, countyData.countyFips);
       const broadbandAccess = getBroadband(countyData.stateFips, countyData.countyFips);
       const calcResult = calculateRuralityScore({ lat: geoData.lat, lng: geoData.lng, populationDensity, ruca, broadbandAccess });
 
@@ -389,10 +429,14 @@ const RuralityApp = () => {
 
       const uiData = buildRuralityDataForUI(calcResult, censusData);
 
-      // Official classification codes
+      // Official classification codes. The OMB badge prefers the authoritative
+      // July 2023 delineation file; the RUCC-derived approximation is only a
+      // fallback for when cbsa.json fails to load.
       const ruccCode = getRUCC(countyData.stateFips, countyData.countyFips);
       const rucaCode = ruca;
-      const omb = getOMBDesignation(ruccCode);
+      const omb = cbsa !== null
+        ? getOMBDesignationFromCBSA(cbsa.status)
+        : getOMBDesignation(ruccCode);
 
       const classifications = {
         rucc: ruccCode !== null ? {
@@ -427,6 +471,8 @@ const RuralityApp = () => {
           description: getLocaleDescription(locale)
         } : null,
         forhp: forhp !== null ? { eligible: forhp === 1 } : null,
+        cbsa,
+        urban: urbanPct !== null ? { pct: urbanPct } : null,
         countyName: countyData.countyName,
         postcode: geoData.postcode
       };
@@ -1161,7 +1207,8 @@ const RuralityApp = () => {
              style={{ borderColor: 'var(--color-wheat)', backgroundColor: 'var(--color-parchment)', color: 'var(--color-ink)' }}>
           <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono mr-2" style={{ color: 'var(--color-ink-muted)' }}>Note</span>
           RUCC 1–3 = Metropolitan, 4–5 = Micropolitan, 6–9 = Nonmetro. RUCA 1–3 = Metropolitan,
-          4–6 = Micropolitan, 7–10 = Rural/Small town. OMB designation is derived from RUCC. The
+          4–6 = Micropolitan, 7–10 = Rural/Small town. OMB designation comes from the July 2023
+          OMB delineations (RUCC-derived only as fallback). The
           composite RRI reflects confidence level <em>{confidence}</em> based on available data.
         </div>
       </div>
@@ -1524,6 +1571,8 @@ const RuralityApp = () => {
       { n: '11', name: 'Index of Relative Rurality (Kim & Waldorf, CC BY 4.0)', vintage: '2020', scale: '3,143 counties', detail: 'Comparison measure (not in composite) — continuous 0–1 index', url: 'https://doi.org/10.5281/zenodo.7675745' },
       { n: '12', name: 'NCES EDGE Locale Codes (public domain)',          vintage: '2021', scale: '33,791 ZCTAs',      detail: 'Comparison measure (not in composite) — 12-category City/Suburb/Town/Rural', url: 'https://nces.ed.gov/programs/edge/Geographic/ZCTAAssignments' },
       { n: '13', name: 'HRSA FORHP rural eligibility (public domain)',    vintage: '2024', scale: '41,062 ZIPs',       detail: 'Comparison measure (not in composite) — rural-health grant eligibility flag', url: 'https://www.hrsa.gov/rural-health/about-us/what-is-rural/data-files' },
+      { n: '14', name: 'OMB Metro–Micro Delineations (public domain)',    vintage: 'Jul 2023', scale: '3,235 counties', detail: 'Comparison measure (not in composite) — metro / micro / noncore; also drives the OMB badge', url: 'https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html' },
+      { n: '15', name: 'Census 2020 Urban–Rural, % urban (public domain)', vintage: '2020', scale: '3,234 counties',   detail: 'Comparison measure (not in composite) — continuous % urban population', url: 'https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html' },
     ];
 
     const limitations = [
@@ -1809,9 +1858,10 @@ const RuralityApp = () => {
       { n: '02', citation: 'USDA Economic Research Service. (2020). Rural-Urban Commuting Area Codes.', url: 'https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/' },
       { n: '03', citation: 'Cromartie, J., & Bucholtz, S. (2008). Defining the “rural” in rural America. Amber Waves, 6(3), 28–34. USDA ERS.', url: null },
       { n: '04', citation: 'Hart, L. G., Larson, E. H., & Lishner, D. M. (2005). Rural definitions for health policy and research. American Journal of Public Health, 95(7), 1149–1155.', url: null },
-      { n: '05', citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan, micropolitan, and combined statistical areas.', url: null },
+      { n: '05', citation: 'US Office of Management and Budget. (2023). OMB Bulletin No. 23-01: Revised delineations of metropolitan, micropolitan, and combined statistical areas. Delineation files distributed by the US Census Bureau.', url: 'https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html' },
       { n: '06', citation: 'Federal Communications Commission. (2025). Broadband Data Collection — National Broadband Map (J25 filing, June 2025).', url: 'https://broadbandmap.fcc.gov/data-download/nationwide-data' },
       { n: '07', citation: 'Kim, A., & Waldorf, B. (2023). The Index of Relative Rurality (IRR): US County Data for 2020 (Version 1.0.0) [Data set]. Zenodo. Licensed under CC BY 4.0.', url: 'https://doi.org/10.5281/zenodo.7675745' },
+      { n: '08', citation: 'US Census Bureau. (2023). County-level 2020 Census urban and rural information (2,611 urban areas; 2020 urban-area criteria).', url: 'https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html' },
     ];
 
     const Chapter = ({ num, kicker, title, children }) => (
@@ -1962,10 +2012,10 @@ const RuralityApp = () => {
         {/* ── §3 Components — RUCC ──────────────────────────────────── */}
         <Chapter num="02" kicker="Component · County-level" title={<>RUCC &amp; the <em style={{ fontStyle: 'italic', color: 'var(--color-ink-muted)' }}>OMB</em> designation.</>}>
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl" style={{ fontFamily: 'var(--font-display)' }}>
-            The USDA Rural-Urban Continuum Code classifies U.S. counties on a 1&ndash;9 scale and is
-            the basis for the OMB Metropolitan / Micropolitan / Nonmetro designation shown in the
-            classifications panel. RUCC is displayed for reference and OMB derivation; it does not
-            enter the composite score directly.
+            The USDA Rural-Urban Continuum Code classifies U.S. counties on a 1&ndash;9 scale. The
+            OMB Metropolitan / Micropolitan / Noncore designation shown in the classifications
+            panel comes from the July 2023 OMB delineations (Bulletin 23-01); a RUCC-based
+            approximation is used only as fallback. Neither enters the composite score directly.
           </p>
 
           <div className="mt-2 rounded-lg border border-[rgba(26,58,42,0.15)] dark:border-[rgba(255,255,255,0.1)] overflow-hidden"
@@ -2240,7 +2290,8 @@ density_to_score <- function(density) {
   pmax(0, pmin(100, round(score)))
 }
 
-# OMB designation from RUCC
+# OMB designation approximated from RUCC (the app itself reads the July 2023
+# OMB delineation file; this mapping is the fallback approximation)
 omb_designation <- function(rucc) {
   case_when(
     rucc <= 3 ~ "Metropolitan",
@@ -2339,6 +2390,10 @@ your_data <- your_data |>
         page: 'https://www.hrsa.gov/rural-health/about-us/what-is-rural/data-files' },
       { n: '06', name: 'Index of Relative Rurality (Kim & Waldorf)', geo: 'County', vintage: '2020', license: 'CC BY 4.0',
         page: 'https://doi.org/10.5281/zenodo.7675745' },
+      { n: '07', name: 'OMB Metro–Micro Delineations (via Census Bureau)', geo: 'County', vintage: 'Jul 2023', license: 'Public domain',
+        page: 'https://www.census.gov/geographies/reference-files/time-series/demo/metro-micro/delineation-files.html' },
+      { n: '08', name: 'Census 2020 Urban–Rural (% urban population)', geo: 'County', vintage: '2020', license: 'Public domain',
+        page: 'https://www.census.gov/programs-surveys/geography/guidance/geo-areas/urban-rural.html' },
     ];
 
     const Chapter = ({ num, kicker, title, children }) => (
