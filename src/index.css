@@ -18,6 +18,13 @@
   --color-ink-subtle: rgba(26,58,42,0.55);
   --color-rule: rgba(26,58,42,0.18);
   --color-rule-soft: rgba(26,58,42,0.10);
+  /* RUCC tier palette — shared by the choropleth, "Places Like This", and the
+     search suggestions. These are used as label text as well as swatch fills,
+     so the dark-mode set below is lightened to stay legible on dark surfaces. */
+  --tier-metro: #991b1b;
+  --tier-urban: #b45309;
+  --tier-rural: #4a7c59;
+  --tier-very-rural: #1a5c2e;
 }
 
 .dark {
@@ -34,6 +41,12 @@
   --color-ink-subtle: rgba(230,226,212,0.5);
   --color-rule: rgba(230,226,212,0.18);
   --color-rule-soft: rgba(230,226,212,0.08);
+  /* Same four tiers, lifted for contrast against the dark parchment surface —
+     the light values sit near 2:1 there and are unreadable as text. */
+  --tier-metro: #e08585;
+  --tier-urban: #e0a75a;
+  --tier-rural: #8fc4a0;
+  --tier-very-rural: #6fd08c;
 }
 
 body {

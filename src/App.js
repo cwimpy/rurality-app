@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
-  Search, MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
+  MapPin, TrendingUp, BarChart3, Plus, X, Menu, Globe, FileSpreadsheet, Printer,
   Navigation, Info, Download, Share2, Zap,
   Building2, DollarSign, AlertCircle, Wifi,
   BookOpen, FlaskConical, ExternalLink, Database, Calculator, ChevronDown
@@ -13,9 +13,12 @@ import EmbedWidget from './components/EmbedWidget';
 import RUCCHistory from './components/RUCCHistory';
 import CompareTable from './components/CompareTable';
 import ScoreDial from './components/ScoreDial';
+import PlaceTypeahead from './components/PlaceTypeahead';
 
 import {
   geocodeWithCache,
+  geocodeCandidates,
+  nameCollisions,
   fetchCensusData,
   getCountyFromCoordinates,
   fetchMultiYearCensusData
@@ -23,7 +26,7 @@ import {
 
 import { calculateRuralityScore } from './services/ruralityCalculator';
 import { loadRucaData, getRUCAForZcta, getRUCADescription, rucaToScore } from './data/rucaZcta';
-import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore } from './data/ruralUrbanCodes';
+import { loadRuccData, getRUCC, getRUCCDescription, ruccToScore, ruccTierColor } from './data/ruralUrbanCodes';
 import { loadBroadbandData, getBroadband } from './data/broadband';
 import { loadFarData, getFARForZip, getFARDescription } from './data/far';
 import { loadNchsData, getNCHSForCounty, getNCHSDescription } from './data/nchs';
@@ -33,11 +36,83 @@ import { loadLocaleData, getLocaleForZcta, getLocaleDescription } from './data/l
 import { loadForhpData, getFORHPForZip } from './data/forhp';
 import { loadCbsaData, getCBSAForCounty } from './data/cbsa';
 import { loadUrbanData, getUrbanPctForCounty } from './data/urban';
+import { loadPlacesData, exactMatches, parseQuery } from './data/places';
+import { stateName } from './data/states';
 
 // Code-split heavy, route-like views so they don't load with the initial bundle
 const BatchLookup = lazy(() => import('./components/BatchLookup'));
 const StateMap = lazy(() => import('./components/StateMap'));
 const SpecimenCard = lazy(() => import('./components/SpecimenCard'));
+
+/**
+ * Decide whether a query names more than one place.
+ *
+ * Two sources, in order of authority. The local county index is exact and free
+ * — it knows all 31 Washingtons, where a geocoder only ever returns the ten it
+ * ranked highest. Anything the index doesn't recognize (a city, an address) is
+ * put to the geocoder, which is asked only about collisions across *states*;
+ * a city and its own township are not a question worth interrupting for.
+ *
+ * Returns null when the query is unambiguous, so the search runs untouched.
+ */
+async function detectAmbiguity(location) {
+  const { state } = parseQuery(location);
+
+  // An explicit state already answers the question.
+  if (!state) {
+    try {
+      await loadPlacesData();
+      const exact = exactMatches(location);
+      if (exact.length > 1) {
+        return {
+          query: location,
+          source: 'county',
+          total: exact.length,
+          options: exact.map(m => ({
+            key: m.fips,
+            label: m.name,
+            sub: `${stateName(m.st)} \u00b7 FIPS ${m.fips}`,
+            state: m.st,
+            query: m.label,
+            rucc: m.rucc,
+          })),
+        };
+      }
+    } catch {
+      // Index unavailable — fall through to the geocoder rather than blocking.
+    }
+  }
+
+  // Needed below to resolve each candidate's county to a RUCC; harmless if the
+  // county branch above already loaded it.
+  await loadPlacesData().catch(() => {});
+
+  const candidates = await geocodeCandidates(location);
+  const collisions = nameCollisions(candidates);
+  if (collisions.length > 1) {
+    return {
+      query: location,
+      source: 'geocode',
+      total: collisions.length,
+      options: collisions.map((c, i) => {
+        // The geocoder names the containing county but not its RUCC. The local
+        // index has it, so each option can carry the same rural/metro read the
+        // county suggestions do rather than an empty placeholder.
+        const inCounty = c.county && c.state ? exactMatches(`${c.county}, ${c.state}`) : [];
+        return {
+          key: `${c.label}-${i}`,
+          label: c.place,
+          sub: [c.county, c.state ? stateName(c.state) : null].filter(Boolean).join(' \u00b7 '),
+          state: c.state,
+          query: c.query,
+          rucc: inCounty.length === 1 ? inCounty[0].rucc : null,
+        };
+      }),
+    };
+  }
+
+  return null;
+}
 
 // Fallback shown while a lazy view's chunk loads
 const ViewFallback = () => (
@@ -333,6 +408,11 @@ const RuralityApp = () => {
   // kicked off afterward.
   const searchIdRef = useRef(0);
 
+  // Set when a query could mean more than one place — { query, source,
+  // options, total }. While it's set, no lookup has run: the user picks first.
+  const [ambiguity, setAmbiguity] = useState(null);
+  const [ambiguityExpanded, setAmbiguityExpanded] = useState(false);
+
   // Preload lookup tables in the background immediately on mount.
   useEffect(() => {
     loadRucaData().catch(() => {});
@@ -372,7 +452,14 @@ const RuralityApp = () => {
   };
 
   // ── Location search ────────────────────────────────────────────────────────
-  const handleLocationSearch = async (location) => {
+  /**
+   * @param {string} location    what to look up
+   * @param {object} [opts]
+   * @param {boolean} [opts.resolved]  skip the ambiguity gate — the caller has
+   *        already established which place is meant (a typeahead pick, a
+   *        disambiguation choice, a map click).
+   */
+  const handleLocationSearch = async (location, { resolved = false } = {}) => {
     if (!location.trim()) return;
     // Capture this search's id; later async steps bail out if the ref has
     // moved on, so a stale search can't stomp a newer one's results.
@@ -381,9 +468,27 @@ const RuralityApp = () => {
 
     setLoading(true);
     setError('');
+    setAmbiguity(null);
     setTrendsData(null); // clear stale trends on new search
 
     try {
+      // Ask before guessing. Nothing below this runs until the query names
+      // exactly one place — otherwise the user picks and we come back here
+      // with resolved: true.
+      if (!resolved) {
+        setLoadingStep('Checking for same-name places…');
+        const collision = await detectAmbiguity(location);
+        if (isStale()) return;
+        if (collision) {
+          setRuralityData(null);
+          setLocationMeta(null);
+          setCurrentLocation('');
+          setAmbiguity(collision);
+          setAmbiguityExpanded(false);
+          return;
+        }
+      }
+
       setLoadingStep('Step 1/3: Geocoding location…');
       const geoData = await geocodeWithCache(location);
       if (isStale()) return;
@@ -572,7 +677,8 @@ const RuralityApp = () => {
             const query = state && name !== 'Current Location'
               ? `${name}, ${state}`
               : name;
-            return handleLocationSearch(query).catch(() => {});
+            // The reverse geocode above already named one place and state.
+            return handleLocationSearch(query, { resolved: true }).catch(() => {});
           })
           .catch(() => {
             setError('Failed to identify current location');
@@ -1242,7 +1348,8 @@ const RuralityApp = () => {
         ? `${place}, ${state}`
         : place || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       setSearchQuery(query);
-      await handleLocationSearch(query);
+      // A map click is a coordinate — there is nothing left to disambiguate.
+      await handleLocationSearch(query, { resolved: true });
     } catch (err) {
       setError('Could not analyze that location. Try clicking a populated area.');
       setLoading(false);
@@ -2969,25 +3076,13 @@ your_data <- your_data |>
               <span>City &middot; County &middot; ZIP</span>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-ink-muted)' }} />
-                <input
-                  type="text"
-                  placeholder="Enter a city, county, or ZIP code…"
-                  aria-label="Search for a location"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch(searchQuery).catch(() => {})}
-                  className="w-full pl-10 pr-4 py-3 bg-transparent border-b-2 text-base outline-none transition-colors"
-                  style={{
-                    borderColor: 'var(--color-rule)',
-                    color: 'var(--color-ink)',
-                    fontFamily: 'var(--font-display)',
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = 'var(--color-wheat)'}
-                  onBlur={(e) => e.target.style.borderColor = 'rgba(26,58,42,0.22)'}
-                />
-              </div>
+              <PlaceTypeahead
+                value={searchQuery}
+                onChange={setSearchQuery}
+                loading={loading}
+                onSubmit={(q) => handleLocationSearch(q).catch(() => {})}
+                onPick={(place) => handleLocationSearch(place.label, { resolved: true }).catch(() => {})}
+              />
               <div className="flex gap-2">
                 <button
                   onClick={getCurrentLocation}
@@ -3038,6 +3133,88 @@ your_data <- your_data |>
               </div>
             )}
 
+            {/* ── Disambiguation ─────────────────────────────────────────────
+                Shown instead of a result when the query names more than one
+                place. No score is computed until the user says which one —
+                picking silently would report another state's county as this
+                one's, with nothing on screen to reveal the substitution. */}
+            {ambiguity && (
+              <div role="group" aria-labelledby="ambiguity-heading" className="mt-4 fg-rise">
+                {/* Stacks on narrow screens — side by side, the heading wraps to
+                    two lines and leaves Dismiss stranded beside the first. */}
+                <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-baseline sm:justify-between pb-2 mb-3 border-b"
+                     style={{ borderColor: 'var(--color-rule)' }}>
+                  <span id="ambiguity-heading" className="text-[0.6rem] uppercase tracking-[0.28em] font-mono"
+                        style={{ color: 'var(--color-wheat)' }}>
+                    Ambiguous &mdash; {ambiguity.total} places share this name
+                  </span>
+                  <button
+                    onClick={() => { setAmbiguity(null); setAmbiguityExpanded(false); }}
+                    className="text-[0.6rem] uppercase tracking-[0.22em] font-mono"
+                    style={{ color: 'var(--color-ink-subtle)' }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+
+                <p className="text-sm mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink-muted)' }}>
+                  &ldquo;{ambiguity.query}&rdquo; matches {ambiguity.total}{' '}
+                  {ambiguity.source === 'county' ? 'county-equivalents' : 'places'} across{' '}
+                  {new Set(ambiguity.options.map(o => o.state)).size} states. Choose one, or add a
+                  state to your search &mdash; <span className="font-mono text-[0.8em]">{ambiguity.options[0].query}</span>.
+                </p>
+
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" aria-label="Matching places">
+                  {(ambiguityExpanded ? ambiguity.options : ambiguity.options.slice(0, 9)).map((opt) => (
+                    <li key={opt.key}>
+                      <button
+                        onClick={() => {
+                          setSearchQuery(opt.query);
+                          setAmbiguity(null);
+                          setAmbiguityExpanded(false);
+                          handleLocationSearch(opt.query, { resolved: true }).catch(() => {});
+                        }}
+                        className="w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-md border transition-colors"
+                        style={{ borderColor: 'var(--color-rule)', backgroundColor: 'var(--color-parchment)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-wheat)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-rule)'; }}
+                      >
+                        <span aria-hidden="true" className="w-[3px] self-stretch rounded-full flex-shrink-0"
+                              style={{ backgroundColor: ruccTierColor(opt.rucc) }} />
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate text-[0.95rem] leading-tight"
+                                style={{ fontFamily: 'var(--font-display)', color: 'var(--color-ink)' }}>
+                            {opt.label}
+                          </span>
+                          <span className="block truncate text-[0.6rem] uppercase tracking-[0.16em] font-mono mt-0.5"
+                                style={{ color: 'var(--color-ink-subtle)' }}>
+                            {opt.sub}
+                          </span>
+                        </span>
+                        <span className="text-[0.7rem] uppercase tracking-[0.22em] font-mono flex-shrink-0"
+                              style={{ color: 'var(--color-ink-muted)' }}>
+                          {opt.state}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {ambiguity.options.length > 9 && (
+                  <button
+                    onClick={() => setAmbiguityExpanded(v => !v)}
+                    aria-expanded={ambiguityExpanded}
+                    className="mt-3 text-[0.62rem] uppercase tracking-[0.24em] font-mono"
+                    style={{ color: 'var(--color-ink-muted)' }}
+                  >
+                    {ambiguityExpanded
+                      ? 'Show fewer'
+                      : `Show all ${ambiguity.options.length} \u2192`}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="mt-4 pt-3 border-t border-dashed border-[rgba(26,58,42,0.18)] dark:border-[rgba(255,255,255,0.1)]">
               <div className="text-[0.6rem] uppercase tracking-[0.28em] font-mono mb-2" style={{ color: 'var(--color-ink-muted)' }}>
                 {recentSearches.length > 0 ? 'Recent' : 'Try an Example'}
@@ -3054,7 +3231,7 @@ your_data <- your_data |>
                     className="px-3 py-1 text-xs uppercase tracking-wider font-mono rounded border transition-colors disabled:opacity-50"
                     style={{ borderColor: 'var(--color-rule)', color: 'var(--color-ink)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-wheat)'; e.currentTarget.style.color = 'var(--color-wheat)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(26,58,42,0.2)'; e.currentTarget.style.color = 'var(--color-forest)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-rule)'; e.currentTarget.style.color = 'var(--color-ink)'; }}
                   >
                     {place}
                   </button>
@@ -3077,7 +3254,7 @@ your_data <- your_data |>
 
         {/* Views */}
         {activeView === 'map' && <MapView />}
-        {activeView === 'statemap'     && <Suspense fallback={<ViewFallback />}><StateMap onLocationSearch={(place) => { setSearchQuery(place); setActiveView('dashboard'); handleLocationSearch(place).catch(() => {}); }} /></Suspense>}
+        {activeView === 'statemap'     && <Suspense fallback={<ViewFallback />}><StateMap onLocationSearch={(place) => { setSearchQuery(place); setActiveView('dashboard'); handleLocationSearch(place, { resolved: true }).catch(() => {}); }} /></Suspense>}
         {activeView === 'batch'        && <Suspense fallback={<ViewFallback />}><BatchLookup /></Suspense>}
         {activeView === 'trends'       && <TrendsView />}
         {activeView === 'methodology'  && <MethodologyView />}
@@ -3261,7 +3438,7 @@ your_data <- your_data |>
                 currentFips={`${locationMeta.stateFips}${locationMeta.countyFips}`}
                 currentRucc={getRUCC(locationMeta.stateFips, locationMeta.countyFips)}
                 currentDensity={ruralityData?.metrics?.populationDensity?.value}
-                onSearch={(place) => { setSearchQuery(place); window.scrollTo({ top: 0, behavior: 'smooth' }); handleLocationSearch(place).catch(() => {}); }}
+                onSearch={(place) => { setSearchQuery(place); window.scrollTo({ top: 0, behavior: 'smooth' }); handleLocationSearch(place, { resolved: true }).catch(() => {}); }}
               />
             )}
           </div>

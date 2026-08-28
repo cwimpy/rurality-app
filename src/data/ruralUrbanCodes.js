@@ -55,5 +55,32 @@ export function ruccToScore(rucc) {
 
 export function isRuralByRUCC(rucc) { return rucc >= 4; }
 
-const ruralUrbanCodes = { RUCC_DESCRIPTIONS, getRUCC, getRUCCDescription, ruccToScore, isRuralByRUCC };
+/**
+ * Four-tier collapse of the nine RUCC codes — the palette the
+ * choropleth, "Places Like This", and the search suggestions all share, so a
+ * county reads the same shade wherever it appears. Returns CSS variables,
+ * which carry the lightened dark-mode values defined in index.css.
+ *
+ * Distinct from getRUCCColor in App.js, which returns Tailwind badge classes.
+ */
+export function ruccTierColor(code) {
+  if (code === null || code === undefined) return 'var(--color-ink-subtle)';
+  if (code <= 3) return 'var(--tier-metro)';
+  if (code <= 5) return 'var(--tier-urban)';
+  if (code <= 7) return 'var(--tier-rural)';
+  return 'var(--tier-very-rural)';
+}
+
+export function ruccTierLabel(code) {
+  if (code === null || code === undefined) return '—';
+  if (code <= 3) return 'Metro';
+  if (code <= 5) return 'Urban';
+  if (code <= 7) return 'Rural';
+  return 'Very rural';
+}
+
+const ruralUrbanCodes = {
+  RUCC_DESCRIPTIONS, getRUCC, getRUCCDescription, ruccToScore, isRuralByRUCC,
+  ruccTierColor, ruccTierLabel,
+};
 export default ruralUrbanCodes;

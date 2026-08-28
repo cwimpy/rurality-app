@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Download, AlertCircle, CheckCircle, Loader, X } from 'lucide-react';
 import { geocodeWithCache, fetchCensusData, getCountyFromCoordinates } from '../utils/apiUtils';
+import { loadPlacesData, countExactMatches } from '../data/places';
 import { calculateRuralityScore } from '../services/ruralityCalculator';
 import { getRUCAForZcta, loadRucaData } from '../data/rucaZcta';
 import { getRUCC } from '../data/ruralUrbanCodes';
@@ -55,15 +56,28 @@ function parseCSV(text) {
     .map((cols) => cols[locCol].trim());
 }
 
+// The export's columns, in order. Declared once so the counts advertised in
+// the UI can't drift from what the CSV actually contains.
+//
+// match_count / ambiguous let a researcher audit the rows where the geocoder
+// chose among same-name places: "Washington County" resolves to one of 31, and
+// without these columns nothing in the output says so.
+const EXPORT_COLUMNS = [
+  'location', 'score', 'classification', 'confidence', 'county', 'state_fips',
+  'county_fips', 'rucc', 'population_density', 'distance_to_metro_mi',
+  'match_count', 'ambiguous', 'status',
+];
+
 function exportResultsCSV(results) {
-  const headers = ['location', 'score', 'classification', 'confidence', 'county', 'state_fips', 'county_fips', 'rucc', 'population_density', 'distance_to_metro_mi', 'status'];
+  const headers = EXPORT_COLUMNS;
   const rows = results.map((r) => {
-    if (r.error) return [r.location, '', '', '', '', '', '', '', '', '', r.error];
+    if (r.error) return [r.location, '', '', '', '', '', '', '', '', '', '', '', r.error];
     const d = r.data;
     return [
       r.location, d.overallScore, d.classification?.label || '', d.confidence || '',
       d.countyName || '', d.stateFips || '', d.countyFips || '',
-      d.rucc ?? '', d.density ?? '', d.distanceMi ?? '', 'OK',
+      d.rucc ?? '', d.density ?? '', d.distanceMi ?? '',
+      d.matchCount ?? '', d.matchCount > 1 ? 'TRUE' : 'FALSE', 'OK',
     ];
   });
   // Double-quote any " in values so CSV consumers (Excel, R, pandas) parse
@@ -143,6 +157,7 @@ export default function BatchLookup() {
     await Promise.all([
       loadRucaData().catch(() => {}),
       loadBroadbandData().catch(() => {}),
+      loadPlacesData().catch(() => {}),
     ]);
 
     for (let i = 0; i < locations.length; i++) {
@@ -151,6 +166,12 @@ export default function BatchLookup() {
       try {
         const geo = await geocodeWithCache(loc);
         if (!geo?.lat) throw new Error('Could not geocode');
+
+        // Two independent views of how ambiguous the input was: the local
+        // county index (exact, knows all 31 Washingtons) and the geocoder's
+        // own distinct-place count (covers cities the index doesn't hold).
+        // Take the larger — either one seeing a collision makes it a collision.
+        const matchCount = Math.max(countExactMatches(loc), geo.matchCount || 1);
 
         const county = await getCountyFromCoordinates(geo.lat, geo.lng);
         const census = await fetchCensusData(county.stateFips, county.countyFips);
@@ -188,6 +209,7 @@ export default function BatchLookup() {
             rucc,
             density: Math.round(populationDensity),
             distanceMi: nearestMetroMi,
+            matchCount,
           },
         });
       } catch (err) {
@@ -247,7 +269,7 @@ export default function BatchLookup() {
               {[
                 ['100', 'locations per batch'],
                 ['1.1s', 'rate-limited per lookup'],
-                ['11', 'columns in the export'],
+                [String(EXPORT_COLUMNS.length), 'columns in the export'],
               ].map(([n, l], i, arr) => (
                 <div key={l} className={`flex items-baseline gap-3 ${i !== arr.length - 1 ? 'mb-2 pb-2 border-b border-dashed' : ''}`}
                      style={i !== arr.length - 1 ? { borderColor: 'var(--color-rule)' } : {}}>
@@ -437,6 +459,18 @@ export default function BatchLookup() {
                         </td>
                         <td className="py-2.5 px-3 fg-display text-sm" style={{ color: 'var(--color-ink)' }}>
                           {r.location}
+                          {/* Say so in the table, not only in the CSV — a row
+                              scored from one of 31 same-name counties looks
+                              exactly like an unambiguous one otherwise. */}
+                          {r.data?.matchCount > 1 && (
+                            <span
+                              className="block text-[0.58rem] uppercase tracking-[0.18em] font-mono mt-0.5"
+                              style={{ color: 'var(--color-wheat)' }}
+                              title={`This name matches ${r.data.matchCount} places. Scored as ${r.data.countyName}. Add a state to the input to choose deliberately.`}
+                            >
+                              Ambiguous &times;{r.data.matchCount}
+                            </span>
+                          )}
                         </td>
                         {r.error ? (
                           <>
@@ -498,7 +532,7 @@ export default function BatchLookup() {
               <div className="px-5 py-4 border-t flex items-center justify-between gap-3"
                    style={{ borderColor: 'var(--color-rule)' }}>
                 <span className="text-[0.65rem] uppercase tracking-[0.24em] font-mono" style={{ color: 'var(--color-ink-muted)' }}>
-                  Ready &mdash; 11 columns &middot; {results.length} rows
+                  Ready &mdash; {EXPORT_COLUMNS.length} columns &middot; {results.length} rows
                 </span>
                 <button
                   onClick={() => exportResultsCSV(results)}

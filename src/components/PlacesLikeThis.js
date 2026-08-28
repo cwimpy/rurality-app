@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader } from 'lucide-react';
-import { getRUCCDescription } from '../data/ruralUrbanCodes';
+import { getRUCCDescription, ruccTierColor } from '../data/ruralUrbanCodes';
 
 const STATE_NAMES = {
   '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
@@ -10,14 +10,6 @@ const STATE_NAMES = {
   '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
   '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
   '54':'WV','55':'WI','56':'WY',
-};
-
-const ruccTierColor = (code) => {
-  if (!code) return 'var(--color-sage)';
-  if (code <= 3) return '#991b1b';
-  if (code <= 5) return '#b45309';
-  if (code <= 7) return '#4a7c59';
-  return '#1a5c2e';
 };
 
 export default function PlacesLikeThis({ currentFips, currentRucc, currentDensity, onSearch }) {

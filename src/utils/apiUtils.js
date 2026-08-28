@@ -1,5 +1,7 @@
 // API Utilities with rate limiting and caching
 
+import { toStateAbbr } from '../data/states';
+
 class APIRateLimiter {
   constructor(maxRequests, timeWindow) {
     this.maxRequests = maxRequests;
@@ -122,6 +124,113 @@ export async function fetchWithRetry(url, options = {}, maxRetries = 3) {
   throw diagnoseFetchError(url, new Error(`Failed after ${maxRetries} attempts: ${lastError.message}`));
 }
 
+// How many raw results to ask Nominatim for. One request either way, so the
+// extra rows are free — and without them there's no way to tell a unique place
+// from one of the 31 Washingtons.
+const GEOCODE_CANDIDATE_LIMIT = 10;
+
+/** USPS abbreviation for a Nominatim address block, when it names a US state. */
+function addressState(address) {
+  const full = address?.state;
+  if (!full) return null;
+  return toStateAbbr(full);
+}
+
+/** The most place-like label Nominatim gives us for an address block. */
+function addressPlace(address, displayName) {
+  return address?.city || address?.town || address?.village || address?.hamlet ||
+         address?.county || displayName.split(',')[0].trim();
+}
+
+/**
+ * Raw Nominatim rows for a query, cached.
+ *
+ * geocodeCandidates and geocodeWithCache both need these, and a search runs
+ * both. Sharing one cache key means that costs one request, not two — which
+ * matters when the budget is one request per second.
+ */
+async function fetchGeocodeRows(location) {
+  const cacheKey = `geo-rows:${location.toLowerCase()}`;
+  const cached = geocodeCache.get(cacheKey);
+  if (cached) return cached;
+
+  await nominatimRateLimiter.throttle();
+
+  const response = await fetchWithRetry(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=us&limit=${GEOCODE_CANDIDATE_LIMIT}&addressdetails=1`
+  );
+
+  const data = await response.json();
+  if (!data || data.length === 0) {
+    throw new Error('Location not found');
+  }
+
+  geocodeCache.set(cacheKey, data);
+  return data;
+}
+
+/** Case- and punctuation-insensitive form, for comparing two place names. */
+function normalizePlace(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Geocode a query and return every distinct place it could mean.
+ *
+ * Nominatim happily returns eight rows for one town — a node, a boundary, a
+ * post office — so results are collapsed to one entry per (place, state) pair.
+ * What's left is genuine ambiguity: the Springfields, the Washingtons.
+ */
+export async function geocodeCandidates(location) {
+  const data = await fetchGeocodeRows(location);
+
+  const seen = new Set();
+  const candidates = [];
+
+  for (const row of data) {
+    const address = row.address || {};
+    const displayName = row.display_name || '';
+    const state = addressState(address);
+    const place = addressPlace(address, displayName);
+    // Same town, different OSM feature — keep the first, which Nominatim
+    // ranked highest.
+    const key = `${normalizePlace(place)}|${state || '??'}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    candidates.push({
+      lat: parseFloat(row.lat),
+      lng: parseFloat(row.lon),
+      displayName,
+      address,
+      place,
+      state,
+      county: address.county || null,
+      label: state ? `${place}, ${state}` : place,
+      // Re-querying by this string resolves the same place unambiguously,
+      // which lets a picked candidate re-enter the normal search path.
+      query: state ? `${place}, ${state}` : displayName,
+    });
+  }
+
+  return candidates;
+}
+
+/**
+ * The candidates that share the top result's name in a *different* state.
+ *
+ * This is deliberately narrow. "Springfield" returning a city and its
+ * surrounding township is not ambiguity worth interrupting for; "Springfield"
+ * in Missouri and Illinois is. Returns [] when there's nothing to ask about.
+ */
+export function nameCollisions(candidates) {
+  if (!candidates || candidates.length < 2) return [];
+  const topName = normalizePlace(candidates[0].place);
+  const sameName = candidates.filter(c => normalizePlace(c.place) === topName);
+  const states = new Set(sameName.map(c => c.state).filter(Boolean));
+  return states.size > 1 ? sameName : [];
+}
+
 // Geocoding with rate limiting and caching
 export async function geocodeWithCache(location) {
   const cacheKey = `geocode:${location.toLowerCase()}`;
@@ -133,17 +242,14 @@ export async function geocodeWithCache(location) {
     return cached;
   }
 
-  await nominatimRateLimiter.throttle();
+  const data = await fetchGeocodeRows(location);
 
-  const response = await fetchWithRetry(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=us&limit=1&addressdetails=1`
+  // data[0] is the same row a limit=1 request would have returned, so asking
+  // for more rows changes nothing about which place gets scored — it only lets
+  // us report how many others were in contention.
+  const distinctPlaces = new Set(
+    data.map(r => `${normalizePlace(addressPlace(r.address || {}, r.display_name || ''))}|${addressState(r.address) || '??'}`)
   );
-
-  const data = await response.json();
-
-  if (!data || data.length === 0) {
-    throw new Error('Location not found');
-  }
 
   const lat = parseFloat(data[0].lat);
   const lng = parseFloat(data[0].lon);
@@ -176,7 +282,10 @@ export async function geocodeWithCache(location) {
     lng,
     displayName: data[0].display_name,
     address: data[0].address,
-    postcode
+    postcode,
+    // Distinct places the query could also have meant. 1 means the query was
+    // unambiguous; anything higher means this result was a pick among several.
+    matchCount: distinctPlaces.size,
   };
 
   geocodeCache.set(cacheKey, result);
@@ -355,6 +464,8 @@ export function getCacheStats() {
 const apiUtils = {
   fetchWithRetry,
   geocodeWithCache,
+  geocodeCandidates,
+  nameCollisions,
   fetchCensusData,
   getCountyFromCoordinates,
   getFipsFromCoordinates,
