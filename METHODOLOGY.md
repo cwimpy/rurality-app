@@ -2,322 +2,292 @@
 
 ## Overview
 
-Rurality.app calculates a **Rural Index Score** (0-100) for any location in the United States using an evidence-based, transparent methodology that prioritizes official federal classifications.
+Rurality.app calculates a **Rural Index Score** (0–100) for any location in the United States using a transparent, evidence-based methodology that builds on official federal classifications.
 
 **Higher scores = more rural** | **Lower scores = more urban**
 
-## Our Approach: Hybrid Model
+> [!note] Working draft
+> The composite Rural Index Score is a **working draft pending peer review** — the weights are currently judgment-based, not yet derived from a formal measurement model. The underlying USDA (RUCA, RUCC) and Census data are official and can be used independently. See *Roadmap: Toward a Validated Index* below.
 
-Rather than create a new classification system from scratch, we've chosen to build upon the **USDA Rural-Urban Continuum Codes** - the federal government's official standard for measuring rurality, used by researchers, policymakers, and federal agencies for decades.
-
-We enhance these official classifications with additional real-time data to provide more granular insights.
+**Methodology version:** 2.0
+**Data vintages:** RUCA 2020 · RUCC 2023 · ACS 2022 (5-year) · FCC BDC J25 (June 2025)
 
 ---
 
-## Score Components & Weights
+## Our Approach: A Hybrid Model Anchored on Federal Classifications
 
-### 1. USDA Rural-Urban Continuum Code (50% weight)
+Rather than invent a new classification system, Rurality.app builds on the U.S. Department of Agriculture's official rural measures — the standards used by researchers, policymakers, and federal agencies for decades — and enhances them with more granular, more frequently updated data.
 
-**What it is:** Official federal classification of all US counties based on metro adjacency and population.
+Two USDA measures do different jobs in the app:
 
-**Source:** USDA Economic Research Service (2013, based on 2010 Census)
-**Coverage:** All 3,142 US counties and county equivalents
-**Update Frequency:** Every 10 years following the decennial census
+- **RUCA (Rural-Urban Commuting Area codes, 2020)** — a **ZCTA-level** classification based on population density, urbanization, and daily commuting flows. Because the interactive app geocodes an address to a ZIP/ZCTA, RUCA is the **primary federal anchor in the live composite score.**
+- **RUCC (Rural-Urban Continuum Codes, 2023)** — a **county-level** classification based on metro-area population and metro adjacency. RUCC is shown as an official displayed classification (county choropleth, OMB designation, "Places Like This") and is the anchor used in the **bulk county-level dataset** (`county_rurality.csv`) that feeds the companion R and Stata packages.
 
-**The 9 RUCC Categories:**
+This split matters: the **interactive score is RUCA-based** (ZCTA granularity), while the **downloadable county dataset is RUCC-based** (county granularity). Both are documented below.
+
+---
+
+## Score Components & Weights (Interactive App)
+
+The live composite score adapts its weights to the data available for a location. The four scenarios below match `src/services/ruralityCalculator.js` exactly.
+
+| Scenario | RUCA | Density | Distance | Broadband | Confidence |
+|---|---:|---:|---:|---:|---|
+| **Full data** (RUCA + broadband) | 50% | 25% | 15% | 10% | High |
+| **RUCA only** (no broadband) | 55% | 25% | 20% | — | Medium-high |
+| **Broadband, no RUCA** | — | 50% | 25% | 25% | Medium |
+| **Density + distance only** | — | 55% | 45% | — | Medium |
+
+When a factor is unavailable, its weight is redistributed to the remaining factors as shown — never filled with placeholder data.
+
+---
+
+### 1. USDA Rural-Urban Commuting Area Code — RUCA (up to 50% weight)
+
+**What it is:** Official federal classification of **ZIP Code Tabulation Areas (ZCTAs)** based on population density, urbanization, and daily commuting flows.
+
+**Source:** USDA Economic Research Service, RUCA 2020 (based on 2020 Census and ACS commuting-flow data)
+**Coverage:** 41,146 ZCTAs
+**Granularity:** Sub-county (ZCTA) — finer than county-level RUCC
+**Lookup:** Address → ZIP/ZCTA (geocoder) → RUCA code
+
+**RUCA codes and index scores:**
 
 | Code | Classification | Score |
-|------|---------------|-------|
-| 1 | Metro counties - 1 million+ population | 11 |
-| 2 | Metro counties - 250,000 to 1 million | 22 |
-| 3 | Metro counties - fewer than 250,000 | 33 |
-| 4 | Nonmetro - urban 20,000+, adjacent to metro | 44 |
-| 5 | Nonmetro - urban 20,000+, not adjacent | 56 |
-| 6 | Nonmetro - urban 2,500-19,999, adjacent | 67 |
-| 7 | Nonmetro - urban 2,500-19,999, not adjacent | 78 |
-| 8 | Nonmetro - rural, adjacent to metro | 89 |
-| 9 | Nonmetro - completely rural, not adjacent | 100 |
+|---|---|---:|
+| 1 | Metropolitan area core | 8 |
+| 2 | Metropolitan area — high commuting | 15 |
+| 3 | Metropolitan area — low commuting | 24 |
+| 4 | Micropolitan (small city) core | 38 |
+| 5 | Micropolitan area — high commuting | 48 |
+| 6 | Micropolitan area — low commuting | 56 |
+| 7 | Small town core | 68 |
+| 8 | Small town — high commuting | 76 |
+| 9 | Small town — low commuting | 84 |
+| 10 | Rural — no significant urban commuting | 95 |
 
-**Why this is our foundation:**
-- Developed by PhD researchers using rigorous methodology
-- Used in peer-reviewed academic research
-- Basis for federal policy and funding decisions
-- Considers both population size AND metro adjacency
-- Updated systematically every 10 years
+Codes 4+ are treated as "officially rural."
 
-**Limitation:** Only provides county-level granularity, updated infrequently
+**Why RUCA as the interactive anchor:** it captures commuting relationships (functional economic ties to urban cores) at sub-county resolution, which better reflects an individual address than a single county-wide code.
+
+**Limitation:** Requires a resolvable ZCTA; ties rurality to commuting flows, which can lag rapid local change.
 
 ---
 
 ### 2. Population Density (25% weight)
 
-**What it is:** Number of people per square mile based on most recent census data
+**What it is:** People per square mile.
 
-**Source:** US Census Bureau, American Community Survey (2022)
-**Formula:** Total Population ÷ Land Area (square miles)
-**Update Frequency:** Annual
+**Source:** US Census Bureau, American Community Survey 5-year estimates (2022); land area from Census TIGERweb (current county boundaries)
+**Update frequency:** Annual
 
-**Scoring (logarithmic scale):**
+**Scoring (logarithmic):**
 ```
-Score = 100 - (log₁₀(density) × 25)
+Score = 100 - (log10(max(1, density)) × 25)
 
-Examples:
-- 1 person/sq mi    → Score: 100 (very rural)
-- 10 people/sq mi   → Score: 75  (rural)
-- 100 people/sq mi  → Score: 50  (mixed)
-- 1,000/sq mi       → Score: 25  (suburban)
-- 10,000/sq mi      → Score: 0   (urban)
-- 27,000+/sq mi     → Score: 0   (NYC-level urban)
+  1 person/sq mi    → 100   (very rural)
+ 10 people/sq mi    →  75   (rural)
+100 people/sq mi    →  50   (mixed)
+1,000/sq mi         →  25   (suburban)
+10,000+/sq mi       →   0   (urban)
 ```
 
-**Why logarithmic?** Population density varies exponentially across the US (from <1 to 27,000+ people/sq mi). A logarithmic scale prevents extremely dense urban areas from dominating the calculation.
-
-**Why this matters:**
-- More granular than county-level RUCC
-- Updated annually (vs RUCC's 10-year cycle)
-- Direct measure of crowding/space
-- Correlates with many rural characteristics (housing patterns, infrastructure, services)
-
-**Data Quality:** ⭐⭐⭐⭐⭐ Excellent - Census Bureau gold standard
+Density is floored at 1/sq mi to avoid `log10` of zero/negatives. A logarithmic scale keeps extremely dense urban areas from dominating the composite.
 
 ---
 
 ### 3. Distance to Metropolitan Areas (15% weight)
 
-**What it is:** Calculated distance to nearest metropolitan statistical areas of various sizes
+**What it is:** Great-circle (Haversine) distance to the nearest metro areas of three size tiers.
 
-**Sources:**
-- Metro area locations: US Census Bureau (2020)
-- Calculation method: Haversine formula (great-circle distance)
-
-**Metro Tiers:**
-- **Large Metro:** 1+ million population (50 cities)
-- **Medium Metro:** 250,000 - 1 million (20 cities)
-- **Small Metro:** 50,000 - 250,000 (10 cities)
+**Source:** Metro locations from Census metro definitions; distances computed with the Haversine formula.
 
 **Scoring:**
 ```
-Distance Score = Weighted average:
-- Distance to nearest Large Metro  (50% weight)
-- Distance to nearest Medium Metro (30% weight)
-- Distance to nearest Small Metro  (20% weight)
-
-Each scaled: min(100, distance / scale_factor)
+Distance Score = 0.5 × min(100, dist_large / 3)
+               + 0.3 × min(100, dist_medium / 2)
+               + 0.2 × min(100, dist_small / 1)
 ```
+where `dist_large`, `dist_medium`, `dist_small` are miles to the nearest large, medium, and small metro respectively.
 
-**Why this matters:**
-- Captures influence of nearby urban areas
-- More nuanced than simple "adjacent/not adjacent"
-- Reflects access to urban services, jobs, culture
-- Accounts for the reality that proximity to ANY significant metro reduces rurality
-
-**Data Quality:** ⭐⭐⭐⭐ Very Good - Official metro definitions, calculated distances
+**Why:** captures the exurban-vs-truly-remote distinction that a binary metro/nonmetro flag misses.
 
 ---
 
 ### 4. Broadband Access (10% weight, when available)
 
-**What it is:** Percentage of population with access to broadband internet
+**What it is:** Share of residential broadband-serviceable locations with service — scored so that *lower* availability raises the rurality score.
 
-**Source:** FCC Broadband Data (when available)
-**Threshold:** 25 Mbps download / 3 Mbps upload (FCC definition)
-**Update Frequency:** Varies by source
+**Source:** FCC **Broadband Data Collection (BDC)**, **J25 filing (data as of June 30, 2025; published April 14, 2026)**
+**Threshold:** ≥ **100/20 Mbps** (the current FCC benchmark, raised from 25/3 in March 2024)
+**Definition:** Percent of residential **broadband-serviceable locations (BSLs)** with at least one provider offering ≥100/20 Mbps via **wired or licensed fixed-wireless** technology. **Satellite and unlicensed fixed wireless are excluded** to match the FCC's BEAD-eligibility footprint.
+**Granularity:** County-level
 
 **Scoring:**
 ```
-Broadband Score = 100 - broadband_access_percentage
+Broadband Score = 100 - percent_served
 
-Examples:
-- 95% broadband access → Score: 5  (urban)
-- 75% broadband access → Score: 25 (suburban)
-- 50% broadband access → Score: 50 (rural)
-- 25% broadband access → Score: 75 (very rural)
+ 95% served → Score:  5  (urban)
+ 75% served → Score: 25  (suburban)
+ 50% served → Score: 50  (rural)
+ 25% served → Score: 75  (very rural)
 ```
 
-**Why this matters:**
-- Key indicator of rural economic opportunity
-- Directly affects remote work viability
-- Correlates with service availability
-- Federal priority for rural development
+**Why:** broadband availability is a federal rural-development priority and a proxy for economic opportunity and remote-work viability.
 
-**Limitation:** Data availability is inconsistent. When unavailable, weight is redistributed to other factors (RUCC 55%, Density 30%, Distance 15%).
-
-**Data Quality:** ⭐⭐⭐ Good - When available; gaps in rural areas
+**Limitations to state plainly:** BDC availability is **provider-reported and historically overstates coverage**; the FCC challenge process and location fabric exist precisely because of that. This is a coarse, county-level, 10% signal — Rurality.app is a rurality index that *includes* a connectivity input, **not** a broadband-mapping tool. For authoritative broadband analysis, use location-level BDC data or specialized community-network datasets.
 
 ---
 
-## What We Deliberately EXCLUDED
+## Bulk County Dataset (`county_rurality.csv`)
 
-### Agricultural Land Use
-**Why excluded:** No reliable, publicly accessible API for real-time agricultural land use data. USDA land use data is available via download but not as a queryable API. Including this with placeholder data would be dishonest.
+The downloadable county file — and the companion **R (`rurality`, on CRAN)** and **Stata (`rurality-stata`)** packages — cannot resolve a sub-county ZCTA, so they use a **county-level, RUCC-anchored** composite:
 
-**Future possibility:** May add if we implement backend data processing.
+**County CSV weights:** RUCC **55%** · density **28%** · distance **17%**
 
-### Healthcare Facility Density
-**Why excluded:** Would require integration with CMS facility database and complex geocoding. Using population density as a proxy would be redundant.
+**RUCC 2023 codes and index scores:**
 
-**Future possibility:** May add with proper CMS API integration.
+| Code | Classification | Score |
+|---|---|---:|
+| 1 | Metro — metro area of 1 million+ | 8 |
+| 2 | Metro — metro area of 250,000–1 million | 18 |
+| 3 | Metro — metro area of fewer than 250,000 | 28 |
+| 4 | Nonmetro — urban 20,000+, adjacent to metro | 42 |
+| 5 | Nonmetro — urban 20,000+, not adjacent | 52 |
+| 6 | Nonmetro — urban 5,000–19,999, adjacent | 62 |
+| 7 | Nonmetro — urban 5,000–19,999, not adjacent | 72 |
+| 8 | Nonmetro — completely rural / <5,000 urban, adjacent | 82 |
+| 9 | Nonmetro — completely rural / <5,000 urban, not adjacent | 92 |
 
-### Economic Diversity
-**Why excluded:** No single metric captures this accurately. Would require complex analysis of BLS employment data across industries.
-
-**Future possibility:** May add industry employment mix analysis.
-
-### Commute Times
-**Why excluded:** Ambiguous signal - could indicate rural isolation OR sprawling suburban development.
-
----
-
-## Confidence Levels
-
-**High Confidence (⭐⭐⭐⭐⭐):** All four factors available
-- USDA RUCC: ✅
-- Population Density: ✅
-- Distance to Metro: ✅
-- Broadband Access: ✅
-
-**Medium Confidence (⭐⭐⭐⭐):** Broadband data unavailable
-- Falls back to 3-factor model
-- Still highly accurate due to RUCC foundation
-
-**Low Confidence (⭐⭐⭐):** County not in RUCC database
-- May occur for newly created counties or territories
-- Falls back to density and distance only
+**RUCC 2023 note:** the 2023 vintage (2020 Census basis, 3,235 counties) **raised the "urban area" population threshold from 2,500 to 5,000** to match the Census Bureau's 2020 urban-area redefinition — so codes 6–9 differ from the 2013 vintage.
 
 ---
 
-## Validation & Accuracy
+## Displayed Classifications (Not Composite Inputs)
 
-### Comparison with USDA Official Classifications
+To serve as a public good, the app surfaces several independent official/peer rural measures **alongside** the score, with provenance and source links. These are **displayed only — they are NOT inputs to the composite score** (that decision is reserved for the validated-index work below):
 
-Our scores align with official USDA definitions:
-
-| USDA Category | Expected Score Range | Validation |
-|---------------|---------------------|------------|
-| Metro (Codes 1-3) | 10-40 | ✅ Validated |
-| Nonmetro Urban (4-5) | 40-60 | ✅ Validated |
-| Nonmetro Town (6-7) | 60-80 | ✅ Validated |
-| Nonmetro Rural (8-9) | 80-100 | ✅ Validated |
-
-### Known Edge Cases
-
-1. **Suburban counties in large metros** may score higher (more rural) than expected if they have low density despite metro classification
-   - This is intentional - reflects lived experience of space
-
-2. **College towns** may score more rural than expected due to surrounding low density
-   - RUCC captures this with metro/nonmetro distinction
-
-3. **Exurban counties** near major metros score as mixed/suburban
-   - Accurately reflects their dual character
+| Measure | Vintage | Unit | Notes |
+|---|---|---|---|
+| USDA ERS **FAR** (Frontier and Remote) | 2020 | ZIP | Remoteness levels |
+| CDC **NCHS** Urban-Rural | 2023 | County | 6-level health-research scheme |
+| USDA ERS **UIC** (Urban Influence Codes) | 2024 | County | 9-category settlement structure |
+| **IRR** (Index of Relative Rurality), Kim & Waldorf | 2020 | County | Continuous 0–1 (CC BY 4.0, Zenodo) |
+| **NCES** EDGE Locale Codes | 2021 | ZCTA | 12-category City/Suburb/Town/Rural |
+| HRSA **FORHP** rural grant-eligibility | 2024 | ZIP | Binary eligibility flag |
+| **OMB** Metro–Micro Delineations (Bulletin 23-01) | Jul 2023 | County | Metro/micro/noncore + CBSA |
+| Census **% urban population** | 2020 | County | Continuous 0–100 |
 
 ---
 
-## Comparison with Other Approaches
+## Score Classifications
 
-### vs. Simple Population Density
-**Their approach:** Only use people/sq mi
-**Problem:** Misses adjacency to metros (exurban vs truly remote)
-**Our advantage:** RUCC captures metro influence
+- **80–100:** Very Rural 🌾
+- **60–79:** Rural 🏞️
+- **40–59:** Mixed 🏘️
+- **20–39:** Suburban 🏡
+- **0–19:** Urban 🏙️
 
-### vs. Distance-Only Models
-**Their approach:** Only measure distance to cities
-**Problem:** Ignores local population characteristics
-**Our advantage:** Balanced with density and official classification
+---
 
-### vs. Complex Multi-Factor Models
-**Their approach:** 10+ factors, many with placeholder data
-**Problem:** Illusion of precision, not defensible
-**Our advantage:** Fewer, higher-quality inputs
+## What We Deliberately EXCLUDED (from the composite)
+
+Rurality.app does not fabricate inputs. Where no honest, publicly queryable data source exists, the factor is left out rather than filled with placeholders:
+
+- **Agricultural land use** — no real-time queryable API (USDA Census of Agriculture is download-only). Candidate for the validated index.
+- **Healthcare facility density** — would require HRSA AHRF integration; population density is a partial proxy. (Note: the FORHP measure shown above is a grant-*eligibility* flag, not a facility-density measure.)
+- **Economic diversity / employment mix** — no single clean metric; candidate for the validated index (ACS employment shares).
+- **Commute-time distributions** — ambiguous signal (rural isolation vs. suburban sprawl).
 
 ---
 
 ## Data Sources & Citations
 
-1. **USDA Economic Research Service**
-   Rural-Urban Continuum Codes, 2013
-   https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/
+**Composite inputs**
+1. **USDA ERS — Rural-Urban Commuting Area Codes (RUCA), 2020.** https://www.ers.usda.gov/data-products/rural-urban-commuting-area-codes/
+2. **USDA ERS — Rural-Urban Continuum Codes (RUCC), 2023.** https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/
+3. **US Census Bureau — American Community Survey, 2022 (5-year).** https://www.census.gov/programs-surveys/acs
+4. **US Census Bureau — TIGERweb, current counties** (coordinate-to-county lookup, boundaries and land area; Connecticut resolves to planning regions).
+5. **Federal Communications Commission — Broadband Data Collection (BDC), J25 filing (June 2025).** https://broadbandmap.fcc.gov/data-download/nationwide-data
 
-2. **US Census Bureau**
-   American Community Survey, 2022
-   https://www.census.gov/programs-surveys/acs
+**Geocoding & live lookups**
+6. **OpenStreetMap Nominatim** (geocoding); **FCC Area API** (fallback coordinate-to-county lookup when TIGERweb is unavailable).
 
-3. **US Census Bureau**
-   Metropolitan Statistical Areas, 2020
-   https://www.census.gov/programs-surveys/metro-micro.html
+**Displayed comparison measures:** USDA ERS FAR (2020), UIC (2024); CDC NCHS Urban-Rural (2023); Kim & Waldorf IRR (2020, Zenodo, CC BY 4.0); NCES EDGE Locale (2021); HRSA FORHP (2024); OMB Metro–Micro Delineations (Bulletin 23-01, Jul 2023); Census % urban population (2020).
 
-4. **Federal Communications Commission**
-   Broadband Deployment Data (when available)
-   https://broadbandmap.fcc.gov/
+---
+
+## Validation & Known Edge Cases
+
+**Alignment with USDA:** composite scores track the official RUCA/RUCC ordering — metro cores land Urban/Suburban, small towns land Mixed/Rural, remote areas land Very Rural.
+
+**Known edge cases (intentional):**
+1. **Low-density ZCTAs inside large metros** can score "more rural" than their metro label — reflecting lived space.
+2. **College towns** can read more rural due to surrounding low density.
+3. **Exurban areas** near major metros read as Mixed/Suburban — reflecting their dual character.
+
+---
+
+## Roadmap: Toward a Validated Index
+
+The current weights are judgment-based. The plan to publish a peer-reviewed index:
+
+1. **Formalize the measurement model** — PCA/CFA on the indicators across all counties; let factor loadings set the weights.
+2. **Expand indicators** — broadband (done), agricultural land use, healthcare density, employment mix, commute times; keep those that load on a single rurality factor.
+3. **Convergent validity** — correlate with RUCC, RUCA, NCHS, Census % urban, IRR.
+4. **Discriminant validity** — show the index isn't reducible to density, income, or poverty.
+5. **Criterion validity** — test prediction of health-access and election-administration outcomes.
+6. **The paper** — construction, validation, application, distribution.
 
 ---
 
 ## Limitations & Transparency
 
-### What We Do Well
-✅ Use official federal data as foundation
-✅ Transparent methodology with citations
-✅ No placeholder or fabricated data
-✅ Clear confidence levels
-✅ Annual updates (where data permits)
+**What we do**
+- ✅ Anchor on official federal classifications (RUCA/RUCC)
+- ✅ Cite every source; show every weight and formula
+- ✅ Use no placeholder or fabricated data
+- ✅ Report confidence levels and redistribute weights transparently
+- ✅ Surface independent official measures alongside the score
 
-### What We Don't Do
-❌ Claim false precision with unavailable data
-❌ Use arbitrary scaling factors without justification
-❌ Mix real and simulated data
-❌ Oversimplify complex rural characteristics into single number
+**What we don't do**
+- ❌ Claim false precision when data is unavailable
+- ❌ Mix real and simulated data
+- ❌ Treat the working-draft composite as a settled federal standard
+- ❌ Reduce rural culture, identity, or community to a single number
 
-### Important Notes
-
-**This is a quantitative model** - it cannot capture:
-- Cultural characteristics of rural life
-- Historical rural identity
-- Quality of community
-- Individual perceptions of rurality
-- Local economic opportunities beyond density
-
-**Use cases:**
-- ✅ Research and demographic analysis
-- ✅ Relative comparisons between locations
-- ✅ Understanding population distribution patterns
-- ❌ Federal funding eligibility (use official RUCC)
-- ❌ Definitive classification of "what is rural"
-
----
-
-## Version History
-
-**Version 1.0** (January 2024)
-- Initial methodology
-- 4-factor hybrid model
-- USDA RUCC as foundation
-
----
-
-## Contact & Feedback
-
-Questions about methodology? Found an issue?
-- Email: cwimpy@mac.com
-- GitHub: https://github.com/cwimpy/rurality-app/issues
+**Appropriate use**
+- ✅ Research, exploratory analysis, and relative comparison of locations
+- ✅ Communicating rurality with a transparent, cited score
+- ❌ Federal funding eligibility — use the official USDA RUCA/RUCC directly
+- ❌ A definitive answer to "what is rural"
 
 ---
 
 ## Academic Use
 
-If you use Rurality.app data in research, please cite:
+If you use Rurality.app in research, please cite the tool and the underlying federal data:
 
 ```
-Wimpy, C. (2024). Rurality.app: A Hybrid Model for Measuring US Rurality.
+Wimpy, C. (2026). Rurality.app: A Hybrid Model for Measuring US Rurality.
 https://rurality.app
+
+USDA Economic Research Service. (2020). Rural-Urban Commuting Area Codes.
+USDA Economic Research Service. (2023). Rural-Urban Continuum Codes.
+https://www.ers.usda.gov/data-products/
 ```
 
-And cite the underlying USDA data:
-```
-USDA Economic Research Service. (2013). Rural-Urban Continuum Codes.
-https://www.ers.usda.gov/data-products/rural-urban-continuum-codes/
-```
+Companion packages: **R** — `rurality` (CRAN); **Stata** — `rurality-stata`.
 
 ---
 
-**Last Updated:** January 15, 2024
-**Methodology Version:** 1.0
-**Data Sources Last Updated:** USDA 2013, Census 2022
+## Contact & Feedback
+
+- Email: cwimpy@mac.com
+- GitHub: https://github.com/cwimpy/rurality-app/issues
+
+---
+
+**Methodology Version:** 2.0
+**Last Updated:** 2026-07-24
+**Data Vintages:** RUCA 2020 · RUCC 2023 · ACS 2022 (5-year) · FCC BDC J25 (June 2025)
