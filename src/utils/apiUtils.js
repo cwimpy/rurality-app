@@ -293,10 +293,10 @@ export async function geocodeWithCache(location) {
 }
 
 // getLandArea is no longer needed as a standalone function —
-// getCountyFromCoordinates returns areaSqMiles from the Census Geocoder.
+// getCountyFromCoordinates returns areaSqMiles from TIGERweb.
 // This stub keeps any legacy imports from breaking.
 export async function getLandArea(_stateFips, _countyFips) {
-  return { areaSqMiles: 1000, areaSqMeters: 2589988110 };
+  return { areaSqMiles: AREA_FALLBACK_SQ_MI, areaSqMeters: AREA_FALLBACK_SQ_MI * SQ_M_PER_SQ_MI };
 }
 
 // Census API with rate limiting and caching
@@ -347,54 +347,102 @@ export async function fetchCensusData(stateFips, countyFips) {
   return result;
 }
 
-// County lookup via FCC Census Area API, then land area from Census TIGER.
-// Returns { stateFips (2-digit), countyFips (3-digit), countyName, areaSqMiles }
+// ── Coordinate → county ──────────────────────────────────────────────────────
+// Returns { stateFips (2-digit), countyFips (3-digit), countyName, areaSqMiles }.
+//
+// Primary: Census TIGERweb, current-vintage Counties layer. One point-in-polygon
+// query returns the county (or county equivalent) FIPS, name and land area.
+// "Current" matters for Connecticut: its county equivalents have been the nine
+// planning regions (09110–09190) in every Census product since 2022, and the
+// ACS no longer answers for the legacy counties (09001–09015).
+//
+// Fallback: the FCC Census Area API, which is 2020-vintage geography and still
+// returns the legacy Connecticut counties. It is only used when TIGERweb fails,
+// and it carries no land area, so density then uses a coarse fallback.
+const TIGER_COUNTIES_URL =
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query';
+const SQ_M_PER_SQ_MI = 2589988.11;
+export const AREA_FALLBACK_SQ_MI = 1000;
+const LOOKUP_TIMEOUT_MS = 8000;
+
+// A hung request would otherwise never reach the fallback. AbortSignal.timeout
+// is missing from some test and older browser runtimes, so degrade to no signal.
+const timeoutSignal = () =>
+  (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function')
+    ? AbortSignal.timeout(LOOKUP_TIMEOUT_MS)
+    : undefined;
+
+function normalizeFips(state, county) {
+  // FCC county_fips is usually 5 chars (state+county) but can come back
+  // without leading zeros (e.g. "2013" for 02013 in AK); pad and split.
+  const stateFips = String(state || '').padStart(2, '0');
+  const countyFips = String(county || '').padStart(5, '0').slice(-3);
+  return { stateFips, countyFips };
+}
+
+async function lookupCountyTiger(lat, lng) {
+  const params = new URLSearchParams({
+    geometry: `${lng},${lat}`,
+    geometryType: 'esriGeometryPoint',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'GEOID,STATE,COUNTY,NAME,AREALAND',
+    returnGeometry: 'false',
+    f: 'json',
+  });
+  const resp = await fetch(`${TIGER_COUNTIES_URL}?${params}`, { signal: timeoutSignal() });
+  if (!resp.ok) throw new Error(`TIGERweb error: ${resp.status}`);
+  const data = await resp.json();
+  if (data.error) throw new Error(`TIGERweb error: ${data.error.message || data.error.code}`);
+  const attrs = data.features?.[0]?.attributes;
+  if (!attrs || !attrs.STATE || !attrs.COUNTY) {
+    throw new Error('TIGERweb returned no county for this location');
+  }
+  const areaLand = Number(attrs.AREALAND);
+  return {
+    ...normalizeFips(attrs.STATE, attrs.COUNTY),
+    countyName: attrs.NAME || '',
+    areaSqMiles: areaLand > 0 ? parseFloat((areaLand / SQ_M_PER_SQ_MI).toFixed(2)) : AREA_FALLBACK_SQ_MI,
+  };
+}
+
+async function lookupCountyFcc(lat, lng) {
+  const fccUrl = `https://geo.fcc.gov/api/census/area?lat=${lat}&lon=${lng}&format=json`;
+  const resp = await fetch(fccUrl, { signal: timeoutSignal() });
+  if (!resp.ok) throw new Error(`FCC API error: ${resp.status}`);
+  const data = await resp.json();
+  if (!data.results || data.results.length === 0) {
+    throw new Error('Could not identify county for this location');
+  }
+  const r = data.results[0];
+  if (!r.state_fips || !r.county_fips) throw new Error('FCC API returned no county FIPS for this location');
+  return {
+    ...normalizeFips(r.state_fips, r.county_fips),
+    countyName: r.county_name || '',
+    areaSqMiles: AREA_FALLBACK_SQ_MI,
+  };
+}
+
 export async function getCountyFromCoordinates(lat, lng) {
   const cacheKey = `county:${lat.toFixed(4)}:${lng.toFixed(4)}`;
   const cached = geocodeCache.get(cacheKey);
   if (cached) return cached;
 
-  // ── FCC Census Area API (CORS-friendly) ─────────────────────────────────
-  const fccUrl = `https://geo.fcc.gov/api/census/area?lat=${lat}&lon=${lng}&format=json`;
-  const fccResp = await fetch(fccUrl);
-  if (!fccResp.ok) throw new Error(`FCC API error: ${fccResp.status}`);
-  const fccData = await fccResp.json();
-
-  if (!fccData.results || fccData.results.length === 0) {
-    throw new Error('Could not identify county for this location');
-  }
-
-  const r = fccData.results[0];
-  const stateFips = String(r.state_fips || '').padStart(2, '0');
-  // FCC county_fips is usually 5 chars (state+county) but can occasionally
-  // come back without leading zeros (e.g., "2013" for 02013 in AK). Normalize
-  // by padding to 5 and taking the last 3 — that matches rucc.json keys.
-  const rawFips = String(r.county_fips || '').padStart(5, '0');
-  const countyFips = rawFips.slice(-3);
-  const countyName = r.county_name || '';
-
-  // ── Land area from Census TIGER (CORS-friendly) ─────────────────────────
-  let areaSqMiles = 1000; // fallback
   try {
-    const tigerUrl =
-      `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/86/query` +
-      `?where=STATE%3D%27${stateFips}%27+AND+COUNTY%3D%27${countyFips}%27` +
-      `&outFields=AREALAND&f=json`;
-    const tigerResp = await fetch(tigerUrl);
-    if (tigerResp.ok) {
-      const tigerData = await tigerResp.json();
-      const areaLand = tigerData.features?.[0]?.attributes?.AREALAND;
-      if (areaLand && areaLand > 0) {
-        areaSqMiles = parseFloat((areaLand / 2589988.11).toFixed(2));
-      }
+    const result = await lookupCountyTiger(lat, lng);
+    geocodeCache.set(cacheKey, result);
+    return result;
+  } catch (tigerErr) {
+    // eslint-disable-next-line no-console
+    console.warn('TIGERweb county lookup failed, falling back to FCC:', tigerErr.message);
+    try {
+      // Not cached: a fallback result carries a placeholder land area, and a
+      // brief TIGERweb blip should not pin a coarse density for an hour.
+      return await lookupCountyFcc(lat, lng);
+    } catch (fccErr) {
+      throw new Error(`County lookup failed (TIGERweb: ${tigerErr.message}; FCC: ${fccErr.message})`);
     }
-  } catch {
-    // TIGER lookup failed — areaSqMiles stays at fallback
   }
-
-  const result = { stateFips, countyFips, countyName, areaSqMiles };
-  geocodeCache.set(cacheKey, result);
-  return result;
 }
 
 // Alias for any legacy callers
